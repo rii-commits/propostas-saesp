@@ -32,7 +32,7 @@ Depois de instalar dependencias:
 
 ```powershell
 npm install
-npm start
+npm run local
 ```
 
 Abra:

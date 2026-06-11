@@ -4,9 +4,9 @@
   "private": true,
   "description": "Painel interno para propostas comerciais SAESP preparado para Vercel e Supabase.",
   "scripts": {
-    "start": "node server.js",
+    "local": "node scripts/local-server.js",
     "dev": "vercel dev",
-    "check": "node --check server.js && node --check api/index.js && node --check src/handler.js"
+    "check": "node --check scripts/local-server.js && node --check api/index.js && node --check src/handler.js"
   },
   "engines": {
     "node": ">=20"
