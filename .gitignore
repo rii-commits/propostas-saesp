@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.env
+.env.local
+.env.*.local
+.vercel/
+.DS_Store
+data/db.json
+data/uploads/
+plataforma-propostas-saesp-deploy/
+plataforma-propostas-saesp-deploy.zip
+COMERCIAL E EVENTOS 2/

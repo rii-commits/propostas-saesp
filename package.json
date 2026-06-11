@@ -1,0 +1,22 @@
+{
+  "name": "plataforma-propostas-saesp",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Painel interno para propostas comerciais SAESP preparado para Vercel e Supabase.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vercel dev",
+    "check": "node --check server.js && node --check api/index.js && node --check api/[...path].js && node --check src/handler.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
+    "docx": "^9.5.1",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "vercel": "^48.10.2"
+  }
+}

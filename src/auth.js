@@ -1,0 +1,142 @@
+const { getConfig } = require("./config");
+const { appendSetCookie, parseCookies, serializeCookie } = require("./http");
+const { createAnonClient, getServiceClient } = require("./supabase");
+
+function publicUser(profile) {
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    role: profile.role,
+    createdAt: profile.created_at || profile.createdAt || "",
+    updatedAt: profile.updated_at || profile.updatedAt || ""
+  };
+}
+
+function canWrite(user) {
+  return user && ["Admin", "Editor"].includes(user.role);
+}
+
+function canAdmin(user) {
+  return user && user.role === "Admin";
+}
+
+function setSessionCookies(res, session) {
+  const config = getConfig();
+  const secure = config.isProduction;
+  const maxAge = session.expires_in || 3600;
+  appendSetCookie(res, serializeCookie(config.accessCookie, session.access_token, {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    path: "/",
+    maxAge
+  }));
+  appendSetCookie(res, serializeCookie(config.refreshCookie, session.refresh_token, {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30
+  }));
+}
+
+function clearSessionCookies(res) {
+  const config = getConfig();
+  const secure = config.isProduction;
+  for (const name of [config.accessCookie, config.refreshCookie]) {
+    appendSetCookie(res, serializeCookie(name, "", {
+      httpOnly: true,
+      secure,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 0
+    }));
+  }
+}
+
+async function getProfile(userId) {
+  const { data, error } = await getServiceClient()
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function login(email, password, res) {
+  const { data, error } = await createAnonClient().auth.signInWithPassword({
+    email: String(email || "").trim().toLowerCase(),
+    password: String(password || "")
+  });
+  if (error || !data.session || !data.user) {
+    throw new Error("Email ou senha invalidos.");
+  }
+
+  const profile = await getProfile(data.user.id);
+  if (!profile) {
+    throw new Error("Usuario autenticado sem perfil autorizado.");
+  }
+
+  setSessionCookies(res, data.session);
+  return publicUser(profile);
+}
+
+async function resetPassword(accessToken, refreshToken, password) {
+  if (!accessToken || !refreshToken) {
+    throw new Error("Link de recuperacao incompleto ou expirado.");
+  }
+  if (String(password || "").length < 8) {
+    throw new Error("A nova senha deve ter pelo menos 8 caracteres.");
+  }
+
+  const client = createAnonClient();
+  const { error: sessionError } = await client.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken
+  });
+  if (sessionError) throw new Error("Link de recuperacao invalido ou expirado.");
+
+  const { error } = await client.auth.updateUser({ password });
+  if (error) throw error;
+}
+
+async function currentUser(req, res) {
+  const config = getConfig();
+  const cookies = parseCookies(req);
+  let accessToken = cookies[config.accessCookie];
+  const refreshToken = cookies[config.refreshCookie];
+
+  if (!accessToken && !refreshToken) return null;
+
+  let authUser = null;
+  if (accessToken) {
+    const { data, error } = await createAnonClient().auth.getUser(accessToken);
+    if (!error) authUser = data.user;
+  }
+
+  if (!authUser && refreshToken) {
+    const { data, error } = await createAnonClient().auth.refreshSession({ refresh_token: refreshToken });
+    if (!error && data.session && data.user) {
+      setSessionCookies(res, data.session);
+      accessToken = data.session.access_token;
+      authUser = data.user;
+    }
+  }
+
+  if (!authUser) return null;
+  const profile = await getProfile(authUser.id);
+  return publicUser(profile);
+}
+
+module.exports = {
+  canAdmin,
+  canWrite,
+  clearSessionCookies,
+  currentUser,
+  login,
+  publicUser,
+  resetPassword
+};
