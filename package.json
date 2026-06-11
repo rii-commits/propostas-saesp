@@ -10,7 +10,7 @@
     "check": "node --check scripts/local-server.js && node --check api/index.js && node --check src/handler.js"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.0",
