@@ -1,6 +1,12 @@
 module.exports = async function handler(req, res) {
   try {
-    const { handleApi } = require("../src/handler");
+    const loadedHandler = require("../src/handler");
+    const handleApi = typeof loadedHandler === "function"
+      ? loadedHandler
+      : loadedHandler.handleApi || loadedHandler.default;
+    if (typeof handleApi !== "function") {
+      throw new TypeError("API handler export is invalid.");
+    }
     return await handleApi(req, res);
   } catch (error) {
     console.error(error);

@@ -145,6 +145,10 @@ async function handleApi(req, res) {
     const url = parseUrl(req);
     const segments = url.pathname.split("/").filter(Boolean);
 
+    if (url.pathname === "/api/health" && req.method === "GET") {
+      return sendJson(res, 200, { ok: true });
+    }
+
     if (url.pathname === "/api/login" && req.method === "POST") {
       return handleLogin(req, res);
     }
@@ -233,6 +237,5 @@ async function handleApi(req, res) {
   }
 }
 
-module.exports = {
-  handleApi
-};
+module.exports = handleApi;
+module.exports.handleApi = handleApi;
