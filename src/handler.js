@@ -24,7 +24,13 @@ function forbidden(res) {
 }
 
 function parseUrl(req) {
-  return new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const rewrittenRoute = url.searchParams.get("route");
+  if (rewrittenRoute) {
+    url.pathname = `/api/${rewrittenRoute.replace(/^\/+/, "")}`;
+    url.searchParams.delete("route");
+  }
+  return url;
 }
 
 function fileBufferFromBody(body) {
