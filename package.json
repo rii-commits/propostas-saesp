@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "vercel dev",
-    "check": "node --check server.js && node --check api/index.js && node --check api/[...path].js && node --check src/handler.js"
+    "check": "node --check server.js && node --check api/index.js && node --check src/handler.js"
   },
   "engines": {
     "node": ">=20"

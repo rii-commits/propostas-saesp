@@ -3,12 +3,13 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 300
-    },
-    "api/[...path].js": {
-      "maxDuration": 300
     }
   },
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?route=:path*"
+    },
     {
       "source": "/login",
       "destination": "/index.html"
