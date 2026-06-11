@@ -2,26 +2,44 @@ const path = require("path");
 const os = require("os");
 const { createRequire } = require("module");
 
-function loadPackage(name) {
+function loadDocxPackage() {
   try {
-    return require(name);
+    return require("docx");
   } catch (error) {
     const bundledRoot = path.join(os.homedir(), ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "node", "node_modules");
     const candidates = [
-      path.join(bundledRoot, name, "package.json"),
-      path.join(bundledRoot, ".pnpm", "node_modules", name, "package.json")
+      path.join(bundledRoot, "docx", "package.json"),
+      path.join(bundledRoot, ".pnpm", "node_modules", "docx", "package.json")
     ];
     for (const candidate of candidates) {
       try {
-        return createRequire(candidate)(name);
+        return createRequire(candidate)("docx");
       } catch {}
     }
     throw error;
   }
 }
 
-const { Document, Packer, Paragraph, TextRun, AlignmentType } = loadPackage("docx");
-const JSZip = loadPackage("jszip");
+function loadJsZipPackage() {
+  try {
+    return require("jszip");
+  } catch (error) {
+    const bundledRoot = path.join(os.homedir(), ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "node", "node_modules");
+    const candidates = [
+      path.join(bundledRoot, "jszip", "package.json"),
+      path.join(bundledRoot, ".pnpm", "node_modules", "jszip", "package.json")
+    ];
+    for (const candidate of candidates) {
+      try {
+        return createRequire(candidate)("jszip");
+      } catch {}
+    }
+    throw error;
+  }
+}
+
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = loadDocxPackage();
+const JSZip = loadJsZipPackage();
 
 function safeFileName(fileName, fallback = "modelo.docx") {
   return String(fileName || fallback).replace(/[\\/:*?"<>|]/g, "-").trim() || fallback;
