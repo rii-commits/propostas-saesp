@@ -13,8 +13,7 @@ module.exports = async function handler(req, res) {
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify({
-      error: "Falha ao iniciar a API.",
-      detail: error?.message || String(error)
+      error: error?.message || "Falha ao iniciar a API."
     }));
   }
 };
