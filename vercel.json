@@ -10,11 +10,47 @@
   },
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/index?route=:path*"
+      "source": "/login",
+      "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/kanban",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/empresas",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/eventos",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/modelos",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/contrapartidas",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/propostas/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/controle",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/historico",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/usuarios",
       "destination": "/index.html"
     }
   ]
