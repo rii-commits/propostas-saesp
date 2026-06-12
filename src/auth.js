@@ -112,7 +112,7 @@ async function requestPasswordReset(email, redirectTo) {
 }
 
 async function resetPassword({ accessToken, refreshToken, code, password }) {
-  if (!code && (!accessToken || !refreshToken)) {
+  if (!code && !accessToken) {
     throw new Error("Link de recuperacao incompleto ou expirado.");
   }
   if (String(password || "").length < 8) {
@@ -120,15 +120,24 @@ async function resetPassword({ accessToken, refreshToken, code, password }) {
   }
 
   const client = createAnonClient();
-  const { error: sessionError } = code
-    ? await client.auth.exchangeCodeForSession(code)
-    : await client.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-  if (sessionError) throw new Error("Link de recuperacao invalido ou expirado.");
+  let user;
+  if (accessToken) {
+    const { data, error } = await client.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw new Error("Link de recuperacao invalido ou expirado.");
+    }
+    user = data.user;
+  } else {
+    const { data, error } = await client.auth.exchangeCodeForSession(code);
+    if (error || !data.user) {
+      throw new Error("Link de recuperacao invalido ou expirado.");
+    }
+    user = data.user;
+  }
 
-  const { error } = await client.auth.updateUser({ password });
+  const { error } = await getServiceClient().auth.admin.updateUserById(user.id, {
+    password
+  });
   if (error) throw error;
 }
 
