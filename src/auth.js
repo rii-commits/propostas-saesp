@@ -75,7 +75,22 @@ async function diagnoseConfiguredUser() {
   if (error) throw error;
 
   const authUser = data.users.find(user => user.email?.toLowerCase() === targetEmail);
-  const profile = authUser ? await getProfile(authUser.id) : null;
+  let profile = authUser ? await getProfile(authUser.id) : null;
+  if (authUser && !profile) {
+    const { data: createdProfile, error: profileError } = await getServiceClient()
+      .from("profiles")
+      .upsert({
+        id: authUser.id,
+        name: "Juarau",
+        email: targetEmail,
+        role: "Admin",
+        updated_at: new Date().toISOString()
+      })
+      .select("*")
+      .single();
+    if (profileError) throw profileError;
+    profile = createdProfile;
+  }
   return {
     project: new URL(getConfig().supabaseUrl).hostname,
     authUserExists: Boolean(authUser),
