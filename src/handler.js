@@ -14,6 +14,7 @@ const {
   canWrite,
   clearSessionCookies,
   currentUser,
+  diagnoseConfiguredUser,
   login,
   requestPasswordReset,
   resetPassword
@@ -181,6 +182,10 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/health" && req.method === "GET") {
       return sendJson(res, 200, { ok: true });
+    }
+
+    if (url.pathname === "/api/diagnose-auth" && req.method === "GET") {
+      return sendJson(res, 200, await diagnoseConfiguredUser());
     }
 
     if (url.pathname === "/api/login" && req.method === "POST") {
