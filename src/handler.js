@@ -150,6 +150,12 @@ async function handleApi(req, res) {
     const url = parseUrl(req);
     const segments = url.pathname.split("/").filter(Boolean);
 
+    if (url.pathname === "/" && req.method === "GET") {
+      res.statusCode = 302;
+      res.setHeader("Location", "/login");
+      return res.end();
+    }
+
     if (url.pathname === "/api/health" && req.method === "GET") {
       return sendJson(res, 200, { ok: true });
     }
