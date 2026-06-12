@@ -66,40 +66,6 @@ async function getProfile(userId) {
   return data;
 }
 
-async function diagnoseConfiguredUser() {
-  const targetEmail = "juuuh2003@gmail.com";
-  const { data, error } = await getServiceClient().auth.admin.listUsers({
-    page: 1,
-    perPage: 1000
-  });
-  if (error) throw error;
-
-  const authUser = data.users.find(user => user.email?.toLowerCase() === targetEmail);
-  let profile = authUser ? await getProfile(authUser.id) : null;
-  if (authUser && !profile) {
-    const { data: createdProfile, error: profileError } = await getServiceClient()
-      .from("profiles")
-      .upsert({
-        id: authUser.id,
-        name: "Juarau",
-        email: targetEmail,
-        role: "Admin",
-        updated_at: new Date().toISOString()
-      })
-      .select("*")
-      .single();
-    if (profileError) throw profileError;
-    profile = createdProfile;
-  }
-  return {
-    project: new URL(getConfig().supabaseUrl).hostname,
-    authUserExists: Boolean(authUser),
-    emailConfirmed: Boolean(authUser?.email_confirmed_at),
-    profileExists: Boolean(profile),
-    profileRole: profile?.role || null
-  };
-}
-
 async function login(email, password, res) {
   const { data, error } = await createAnonClient().auth.signInWithPassword({
     email: String(email || "").trim().toLowerCase(),
@@ -228,7 +194,6 @@ module.exports = {
   canWrite,
   clearSessionCookies,
   currentUser,
-  diagnoseConfiguredUser,
   login,
   publicUser,
   requestPasswordReset,
