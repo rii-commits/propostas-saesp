@@ -8,9 +8,17 @@ function requiredEnv(name) {
   return value;
 }
 
+function supabaseProjectUrl() {
+  try {
+    return new URL(requiredEnv("SUPABASE_URL")).origin;
+  } catch {
+    throw new Error("SUPABASE_URL must be a valid project URL.");
+  }
+}
+
 function getConfig() {
   return {
-    supabaseUrl: requiredEnv("SUPABASE_URL"),
+    supabaseUrl: supabaseProjectUrl(),
     supabaseAnonKey: requiredEnv("SUPABASE_ANON_KEY"),
     supabaseServiceRoleKey: requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
     docxBucket: process.env.SUPABASE_DOCX_BUCKET || DEFAULT_BUCKET,
