@@ -9,7 +9,15 @@ const {
   resourceCollection,
   updateResource
 } = require("./repository");
-const { canAdmin, canWrite, clearSessionCookies, currentUser, login, resetPassword } = require("./auth");
+const {
+  canAdmin,
+  canWrite,
+  clearSessionCookies,
+  currentUser,
+  login,
+  requestPasswordReset,
+  resetPassword
+} = require("./auth");
 const { parseBody, sendBuffer, sendJson } = require("./http");
 const { buildProposalReplacements, fillTemplate, proposalYear, sanitizeEntity } = require("./validation");
 const { generateFromTemplateBuffer, generateGenericDocx, importCounterpartsDocx, importTemplateDocx } = require("./docx");
@@ -55,6 +63,19 @@ async function handleResetPassword(req, res) {
   });
   clearSessionCookies(res);
   return sendJson(res, 200, { ok: true });
+}
+
+async function handleRequestPasswordReset(req, res) {
+  const body = await parseBody(req);
+  const protocol = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  if (!host) throw new Error("Nao foi possivel determinar o endereco do aplicativo.");
+
+  await requestPasswordReset(body.email, `${protocol}://${host}/reset-password`);
+  return sendJson(res, 200, {
+    ok: true,
+    message: "Se o email estiver cadastrado, voce recebera um link para definir a nova senha."
+  });
 }
 
 async function handleImportTemplate(req, res) {
@@ -166,6 +187,10 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/reset-password" && req.method === "POST") {
       return handleResetPassword(req, res);
+    }
+
+    if (url.pathname === "/api/request-password-reset" && req.method === "POST") {
+      return handleRequestPasswordReset(req, res);
     }
 
     if (url.pathname === "/api/logout" && req.method === "POST") {

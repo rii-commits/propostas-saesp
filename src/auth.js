@@ -84,6 +84,21 @@ async function login(email, password, res) {
   return publicUser(profile);
 }
 
+async function requestPasswordReset(email, redirectTo) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) throw new Error("Informe o email cadastrado.");
+
+  const { error } = await createAnonClient().auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo
+  });
+  if (error) {
+    if (error.status === 429 || /rate limit/i.test(error.message || "")) {
+      throw new Error("Limite de emails atingido. Aguarde cerca de uma hora e tente novamente.");
+    }
+    throw error;
+  }
+}
+
 async function resetPassword({ accessToken, refreshToken, code, password }) {
   if (!code && (!accessToken || !refreshToken)) {
     throw new Error("Link de recuperacao incompleto ou expirado.");
@@ -140,5 +155,6 @@ module.exports = {
   currentUser,
   login,
   publicUser,
+  requestPasswordReset,
   resetPassword
 };

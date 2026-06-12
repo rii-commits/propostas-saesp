@@ -246,6 +246,7 @@ function renderLogin(error = "") {
             <input name="password" type="password" autocomplete="current-password" required>
           </label>
           <button class="btn primary" style="width:100%;margin-top:16px" type="submit">Entrar</button>
+          <button id="forgotPasswordButton" class="btn" style="width:100%;margin-top:10px" type="button">Esqueci minha senha</button>
           ${error ? `<p class="muted" style="color:#b42318">${escapeHtml(error)}</p>` : ""}
         </form>
       </section>
@@ -264,6 +265,51 @@ function renderLogin(error = "") {
       await bootstrap();
     } catch (err) {
       renderLogin(err.message);
+    }
+  });
+
+  document.getElementById("forgotPasswordButton").addEventListener("click", renderForgotPassword);
+}
+
+function renderForgotPassword() {
+  app().innerHTML = `
+    <main class="login-shell">
+      <section class="login-card">
+        <img class="login-logo" src="/saesp-logo.png" alt="SAESP">
+        <h1>Recuperar senha</h1>
+        <p>Informe o email cadastrado para receber um novo link.</p>
+        <form id="forgotPasswordForm" class="panel" style="box-shadow:none;border:0;padding:18px 0 0;margin:0">
+          <label class="field">
+            <span>Email</span>
+            <input name="email" type="email" autocomplete="email" required>
+          </label>
+          <button class="btn primary" style="width:100%;margin-top:16px" type="submit">Enviar link</button>
+          <button id="backToLoginButton" class="btn" style="width:100%;margin-top:10px" type="button">Voltar ao login</button>
+          <p id="forgotPasswordMessage" class="muted"></p>
+        </form>
+      </section>
+    </main>
+  `;
+
+  document.getElementById("backToLoginButton").addEventListener("click", () => renderLogin());
+  document.getElementById("forgotPasswordForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const messageNode = document.getElementById("forgotPasswordMessage");
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    messageNode.style.color = "";
+    messageNode.textContent = "Enviando...";
+    try {
+      const form = new FormData(event.currentTarget);
+      const result = await api("/api/request-password-reset", {
+        method: "POST",
+        body: JSON.stringify(Object.fromEntries(form))
+      });
+      messageNode.textContent = result.message;
+    } catch (error) {
+      messageNode.style.color = "#b42318";
+      messageNode.textContent = error.message;
+      submitButton.disabled = false;
     }
   });
 }
