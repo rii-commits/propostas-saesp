@@ -47,7 +47,12 @@ async function handleLogin(req, res) {
 
 async function handleResetPassword(req, res) {
   const body = await parseBody(req);
-  await resetPassword(body.accessToken, body.refreshToken, body.password);
+  await resetPassword({
+    accessToken: body.accessToken,
+    refreshToken: body.refreshToken,
+    code: body.code,
+    password: body.password
+  });
   clearSessionCookies(res);
   return sendJson(res, 200, { ok: true });
 }

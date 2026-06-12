@@ -84,8 +84,8 @@ async function login(email, password, res) {
   return publicUser(profile);
 }
 
-async function resetPassword(accessToken, refreshToken, password) {
-  if (!accessToken || !refreshToken) {
+async function resetPassword({ accessToken, refreshToken, code, password }) {
+  if (!code && (!accessToken || !refreshToken)) {
     throw new Error("Link de recuperacao incompleto ou expirado.");
   }
   if (String(password || "").length < 8) {
@@ -93,10 +93,12 @@ async function resetPassword(accessToken, refreshToken, password) {
   }
 
   const client = createAnonClient();
-  const { error: sessionError } = await client.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken
-  });
+  const { error: sessionError } = code
+    ? await client.auth.exchangeCodeForSession(code)
+    : await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
   if (sessionError) throw new Error("Link de recuperacao invalido ou expirado.");
 
   const { error } = await client.auth.updateUser({ password });

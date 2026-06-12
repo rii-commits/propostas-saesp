@@ -143,14 +143,28 @@ async function bootstrap() {
 }
 
 function recoverySession() {
-  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
-  if (params.get("type") !== "recovery") return null;
-  const accessToken = params.get("access_token");
-  const refreshToken = params.get("refresh_token");
-  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const queryParams = new URLSearchParams(location.search);
+  const accessToken = hashParams.get("access_token");
+  const refreshToken = hashParams.get("refresh_token");
+  const code = queryParams.get("code");
+  const type = hashParams.get("type") || queryParams.get("type");
+  const recoveryPath = location.pathname === "/reset-password";
+
+  if (accessToken && refreshToken && (type === "recovery" || recoveryPath)) {
+    return { accessToken, refreshToken };
+  }
+  if (code && (type === "recovery" || recoveryPath)) {
+    return { code };
+  }
+  if (recoveryPath) {
+    return { error: "Este link de recuperacao esta incompleto ou expirou. Solicite um novo email." };
+  }
+  return null;
 }
 
 function renderPasswordReset(recovery) {
+  const linkError = recovery.error || "";
   app().innerHTML = `
     <main class="login-shell">
       <section class="login-card">
@@ -166,8 +180,9 @@ function renderPasswordReset(recovery) {
             <span>Confirmar senha</span>
             <input name="passwordConfirmation" type="password" minlength="8" autocomplete="new-password" required>
           </label>
-          <button class="btn primary" style="width:100%;margin-top:16px" type="submit">Salvar senha</button>
-          <p id="passwordResetError" class="muted" style="color:#b42318"></p>
+          <button class="btn primary" style="width:100%;margin-top:16px" type="submit" ${linkError ? "disabled" : ""}>Salvar senha</button>
+          <p id="passwordResetError" class="muted" style="color:#b42318">${escapeHtml(linkError)}</p>
+          ${linkError ? '<p><a href="/login">Voltar ao login</a></p>' : ""}
         </form>
       </section>
     </main>
@@ -189,6 +204,7 @@ function renderPasswordReset(recovery) {
         body: JSON.stringify({
           accessToken: recovery.accessToken,
           refreshToken: recovery.refreshToken,
+          code: recovery.code,
           password
         })
       });
