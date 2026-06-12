@@ -60,6 +60,7 @@ async function handleResetPassword(req, res) {
     accessToken: body.accessToken,
     refreshToken: body.refreshToken,
     code: body.code,
+    codeVerifier: body.codeVerifier,
     password: body.password
   });
   clearSessionCookies(res);
@@ -68,7 +69,11 @@ async function handleResetPassword(req, res) {
 
 async function handleRequestPasswordReset(req, res) {
   const body = await parseBody(req);
-  await requestPasswordReset(body.email, `${getConfig().appUrl}/reset-password`);
+  await requestPasswordReset(
+    body.email,
+    `${getConfig().appUrl}/reset-password`,
+    body.codeChallenge
+  );
   return sendJson(res, 200, {
     ok: true,
     message: "Se o email estiver cadastrado, voce recebera um link para definir a nova senha."

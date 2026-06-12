@@ -84,7 +84,7 @@ async function login(email, password, res) {
   return publicUser(profile);
 }
 
-async function requestPasswordReset(email, redirectTo) {
+async function requestPasswordReset(email, redirectTo, codeChallenge) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Informe o email cadastrado.");
 
@@ -98,7 +98,11 @@ async function requestPasswordReset(email, redirectTo) {
       Authorization: `Bearer ${config.supabaseAnonKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ email: normalizedEmail })
+    body: JSON.stringify({
+      email: normalizedEmail,
+      code_challenge: codeChallenge || undefined,
+      code_challenge_method: codeChallenge ? "s256" : undefined
+    })
   });
 
   if (!response.ok) {
@@ -111,7 +115,7 @@ async function requestPasswordReset(email, redirectTo) {
   }
 }
 
-async function resetPassword({ accessToken, refreshToken, code, password }) {
+async function resetPassword({ accessToken, refreshToken, code, codeVerifier, password }) {
   if (!code && !accessToken) {
     throw new Error("Link de recuperacao incompleto ou expirado.");
   }
@@ -128,8 +132,24 @@ async function resetPassword({ accessToken, refreshToken, code, password }) {
     }
     user = data.user;
   } else {
-    const { data, error } = await client.auth.exchangeCodeForSession(code);
-    if (error || !data.user) {
+    if (!codeVerifier) {
+      throw new Error("Abra o link no mesmo navegador em que solicitou a recuperacao.");
+    }
+    const config = getConfig();
+    const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+      method: "POST",
+      headers: {
+        apikey: config.supabaseAnonKey,
+        Authorization: `Bearer ${config.supabaseAnonKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        auth_code: code,
+        code_verifier: codeVerifier
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.user) {
       throw new Error("Link de recuperacao invalido ou expirado.");
     }
     user = data.user;

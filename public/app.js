@@ -148,6 +148,7 @@ function recoverySession() {
   const accessToken = hashParams.get("access_token");
   const refreshToken = hashParams.get("refresh_token");
   const code = queryParams.get("code");
+  const codeVerifier = localStorage.getItem("proposal_recovery_code_verifier");
   const type = hashParams.get("type") || queryParams.get("type");
   const recoveryPath = location.pathname === "/reset-password";
 
@@ -155,7 +156,9 @@ function recoverySession() {
     return { accessToken, refreshToken };
   }
   if (code && (type === "recovery" || recoveryPath)) {
-    return { code };
+    return codeVerifier
+      ? { code, codeVerifier }
+      : { error: "Abra este link no mesmo navegador em que voce solicitou a recuperacao." };
   }
   if (recoveryPath) {
     return { error: "Este link de recuperacao esta incompleto ou expirou. Solicite um novo email." };
@@ -205,9 +208,11 @@ function renderPasswordReset(recovery) {
           accessToken: recovery.accessToken,
           refreshToken: recovery.refreshToken,
           code: recovery.code,
+          codeVerifier: recovery.codeVerifier,
           password
         })
       });
+      localStorage.removeItem("proposal_recovery_code_verifier");
       history.replaceState({}, "", "/login");
       location.hash = "";
       renderLogin("Senha atualizada. Entre com a nova senha.");
@@ -301,10 +306,16 @@ function renderForgotPassword() {
     messageNode.textContent = "Enviando...";
     try {
       const form = new FormData(event.currentTarget);
+      const codeVerifier = createRecoveryCodeVerifier();
+      const codeChallenge = await createRecoveryCodeChallenge(codeVerifier);
       const result = await api("/api/request-password-reset", {
         method: "POST",
-        body: JSON.stringify(Object.fromEntries(form))
+        body: JSON.stringify({
+          ...Object.fromEntries(form),
+          codeChallenge
+        })
       });
+      localStorage.setItem("proposal_recovery_code_verifier", codeVerifier);
       messageNode.textContent = result.message;
     } catch (error) {
       messageNode.style.color = "#b42318";
@@ -312,6 +323,19 @@ function renderForgotPassword() {
       submitButton.disabled = false;
     }
   });
+}
+
+function createRecoveryCodeVerifier() {
+  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function createRecoveryCodeChallenge(verifier) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function renderApp() {
