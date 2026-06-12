@@ -168,7 +168,15 @@ async function handleApi(req, res) {
     }
 
     const user = await currentUser(req, res);
-    if (!user) return sendJson(res, 401, { error: "Login necessario." });
+    if (!user) {
+      const acceptsHtml = String(req.headers.accept || "").includes("text/html");
+      if (url.pathname === "/api/bootstrap" && req.method === "GET" && acceptsHtml) {
+        res.statusCode = 302;
+        res.setHeader("Location", `/reset-password${url.search}`);
+        return res.end();
+      }
+      return sendJson(res, 401, { error: "Login necessario." });
+    }
 
     const db = await loadAll();
     if (url.pathname === "/api/bootstrap" && req.method === "GET") {
