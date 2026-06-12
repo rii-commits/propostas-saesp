@@ -25,6 +25,7 @@ Aplicativo interno para gerir empresas, eventos, modelos, contrapartidas e propo
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `SUPABASE_DOCX_BUCKET`
+   - `APP_URL` (`https://plataforma-saesp.vercel.app`)
 
 ## Rodar localmente
 
