@@ -88,14 +88,26 @@ async function requestPasswordReset(email, redirectTo) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Informe o email cadastrado.");
 
-  const { error } = await createAnonClient().auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo
+  const config = getConfig();
+  const endpoint = new URL("/auth/v1/recover", config.supabaseUrl);
+  endpoint.searchParams.set("redirect_to", redirectTo);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      apikey: config.supabaseAnonKey,
+      Authorization: `Bearer ${config.supabaseAnonKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email: normalizedEmail })
   });
-  if (error) {
-    if (error.status === 429 || /rate limit/i.test(error.message || "")) {
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message = payload.msg || payload.message || payload.error_description || payload.error || "";
+    if (response.status === 429 || /rate limit/i.test(message)) {
       throw new Error("Limite de emails atingido. Aguarde cerca de uma hora e tente novamente.");
     }
-    throw error;
+    throw new Error(message || "Nao foi possivel enviar o email de recuperacao.");
   }
 }
 
