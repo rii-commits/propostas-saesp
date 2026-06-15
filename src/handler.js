@@ -23,7 +23,6 @@ const { parseBody, sendBuffer, sendJson } = require("./http");
 const { buildProposalReplacements, fillTemplate, proposalYear, sanitizeEntity } = require("./validation");
 const { generateFromTemplateBuffer, generateGenericDocx, importCounterpartsDocx, importTemplateDocx } = require("./docx");
 const { downloadDocx, uploadDocx } = require("./storage");
-const { importHistory } = require("./history-import");
 
 function notFound(res) {
   return sendJson(res, 404, { error: "Rota nao encontrada." });
@@ -194,11 +193,6 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/request-password-reset" && req.method === "POST") {
       return handleRequestPasswordReset(req, res);
-    }
-
-    if (url.pathname === "/api/migrate-history" && req.method === "POST") {
-      const result = await importHistory(req, await parseBody(req));
-      return sendJson(res, 200, result);
     }
 
     if (url.pathname === "/api/logout" && req.method === "POST") {
