@@ -3,7 +3,8 @@ const workflowStages = [
   "Proposta enviada",
   "Em formalizacao",
   "Em realizacao",
-  "Finalizado"
+  "Finalizado",
+  "Declinios"
 ];
 
 const proposalStatuses = [

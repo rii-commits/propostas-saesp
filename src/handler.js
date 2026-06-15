@@ -9,6 +9,7 @@ const {
   resourceCollection,
   updateResource
 } = require("./repository");
+const { createHash, timingSafeEqual } = require("crypto");
 const {
   canAdmin,
   canWrite,
@@ -23,6 +24,27 @@ const { parseBody, sendBuffer, sendJson } = require("./http");
 const { buildProposalReplacements, fillTemplate, proposalYear, sanitizeEntity } = require("./validation");
 const { generateFromTemplateBuffer, generateGenericDocx, importCounterpartsDocx, importTemplateDocx } = require("./docx");
 const { downloadDocx, uploadDocx } = require("./storage");
+const { getServiceClient } = require("./supabase");
+
+const DECLINE_REPAIR_TOKEN_HASH = "7e9aa897ddf4550011fc29322b49362ff54b2e3df6a5f4e67c4a1943194cdc56";
+
+async function repairDeclinedProposals(req, res) {
+  const token = String(req.headers["x-repair-token"] || "");
+  const actual = Buffer.from(createHash("sha256").update(token).digest("hex"));
+  const expected = Buffer.from(DECLINE_REPAIR_TOKEN_HASH);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    return sendJson(res, 403, { error: "Reparo nao autorizado." });
+  }
+
+  const { data, error } = await getServiceClient()
+    .from("proposals")
+    .update({ workflow_stage: "Declinios", updated_at: new Date().toISOString() })
+    .eq("status", "Recusada")
+    .neq("workflow_stage", "Declinios")
+    .select("control_code");
+  if (error) throw error;
+  return sendJson(res, 200, { repaired: (data || []).map(item => item.control_code) });
+}
 
 function notFound(res) {
   return sendJson(res, 404, { error: "Rota nao encontrada." });
@@ -181,6 +203,10 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/health" && req.method === "GET") {
       return sendJson(res, 200, { ok: true });
+    }
+
+    if (url.pathname === "/api/repair-declines" && req.method === "POST") {
+      return repairDeclinedProposals(req, res);
     }
 
     if (url.pathname === "/api/login" && req.method === "POST") {
