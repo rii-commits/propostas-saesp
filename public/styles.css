@@ -282,7 +282,7 @@ textarea:disabled {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   margin-bottom: 18px;
 }
 
@@ -299,6 +299,23 @@ textarea:disabled {
   display: block;
   margin-top: 8px;
   font-size: 28px;
+}
+
+.metric.financial {
+  border-top: 3px solid var(--aqua);
+}
+
+.metric.financial strong {
+  font-size: 22px;
+  color: var(--brand);
+}
+
+.metric.financial.converted {
+  border-top-color: #2f855a;
+}
+
+.metric.financial.converted strong {
+  color: #226844;
 }
 
 .filter-grid {

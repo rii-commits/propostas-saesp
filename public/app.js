@@ -87,10 +87,20 @@ function localProposalCode(payload) {
   return `C pendente/${year}`;
 }
 
+function parseMoneyValue(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const cleaned = String(value || "").replace(/[^\d,.-]/g, "");
+  if (!cleaned) return 0;
+  const normalized = cleaned.includes(",")
+    ? cleaned.replace(/\./g, "").replace(",", ".")
+    : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function money(value) {
-  if (!value) return "";
-  const parsed = Number(String(value).replace(/[^\d,.-]/g, "").replace(",", "."));
-  if (Number.isNaN(parsed)) return value;
+  if (value === "" || value === null || value === undefined) return "";
+  const parsed = parseMoneyValue(value);
   return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
@@ -407,6 +417,14 @@ function pageHeader(title, subtitle, action = "") {
 function renderDashboard(main) {
   const proposals = enrichedProposals();
   const filtered = filterProposals(proposals);
+  const sentStages = workflowStages.filter(stage => stage !== "Em confeccao");
+  const convertedStages = ["Em formalizacao", "Em realizacao", "Finalizado"];
+  const sentValue = proposals
+    .filter(item => sentStages.includes(item.workflowStage))
+    .reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const convertedValue = proposals
+    .filter(item => convertedStages.includes(item.workflowStage))
+    .reduce((total, item) => total + parseMoneyValue(item.value), 0);
   main.innerHTML = `
     ${pageHeader("Dashboard", "Busca e acompanhamento das propostas comerciais.")}
     <section class="metric-grid">
@@ -414,6 +432,8 @@ function renderDashboard(main) {
       <div class="metric"><span>Eventos</span><strong>${state.data.events.length}</strong></div>
       <div class="metric"><span>Rascunhos</span><strong>${proposals.filter(item => item.status === "Rascunho").length}</strong></div>
       <div class="metric"><span>Finais</span><strong>${proposals.filter(item => item.status === "Final").length}</strong></div>
+      <div class="metric financial" title="Propostas que já saíram da etapa Em confecção"><span>Valor em propostas enviadas</span><strong>${money(sentValue)}</strong></div>
+      <div class="metric financial converted" title="Propostas em formalização, realização ou finalizadas"><span>Valor em propostas convertidas</span><strong>${money(convertedValue)}</strong></div>
     </section>
     ${proposalFilters()}
     ${proposalTable(filtered)}
