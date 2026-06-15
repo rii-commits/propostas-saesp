@@ -488,12 +488,12 @@ function renderKanban(main) {
       ${workflowStages.map(stage => {
         const items = proposals.filter(item => item.workflowStage === stage);
         return `
-          <div class="kanban-column">
+          <div class="kanban-column" data-kanban-stage="${escapeAttr(stage)}">
             <div class="kanban-header">
               <strong>${workflowLabels[stage]}</strong>
               <span>${items.length}</span>
             </div>
-            <div class="kanban-cards">
+            <div class="kanban-cards" data-kanban-dropzone="${escapeAttr(stage)}">
               ${items.length ? items.map(item => kanbanCard(item)).join("") : `<div class="kanban-empty">Sem propostas nesta etapa.</div>`}
             </div>
           </div>
@@ -506,9 +506,8 @@ function renderKanban(main) {
 }
 
 function kanbanCard(item) {
-  const index = workflowStages.indexOf(item.workflowStage);
   return `
-    <article class="kanban-card" data-planner-proposal="${item.id}" role="button" tabindex="0" title="Abrir acompanhamento da proposta" onclick="if (!event.target.closest('button')) openKanbanPlanner('${escapeAttr(item.id)}')" onkeydown="if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('button')) { event.preventDefault(); openKanbanPlanner('${escapeAttr(item.id)}'); }">
+    <article class="kanban-card" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
       <div class="kanban-card-title">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="badge ${item.status === "Final" ? "final" : "draft"}">${item.status}</span>
@@ -520,11 +519,8 @@ function kanbanCard(item) {
         <span>${escapeHtml(item.ownerName)}</span>
       </div>
       <div class="kanban-note-count">${item.noteCount ? `${item.noteCount} observações` : "Sem observações"}</div>
-      <div class="row-actions">
-        <button class="btn" data-open-planner="${item.id}" onclick="event.stopPropagation(); openKanbanPlanner('${escapeAttr(item.id)}')">Acompanhar</button>
-        <button class="btn" data-edit-proposal="${item.id}">Editar</button>
-        <button class="btn" data-stage="${item.id}" data-direction="-1" ${!canWrite() || index <= 0 ? "disabled" : ""}>Voltar</button>
-        <button class="btn primary" data-stage="${item.id}" data-direction="1" ${!canWrite() || index >= workflowStages.length - 1 ? "disabled" : ""}>Avançar</button>
+      <div class="kanban-card-actions">
+        <button class="kanban-edit" data-edit-proposal="${item.id}" type="button">Editar</button>
       </div>
     </article>
   `;
@@ -532,43 +528,86 @@ function kanbanCard(item) {
 
 function bindKanbanActions(scope) {
   bindProposalActions(scope);
+  let draggedProposalId = null;
+  let dragCompleted = false;
+
   scope.querySelectorAll("[data-planner-proposal]").forEach(card => {
     const open = event => {
-      if (event.target.closest("button")) return;
+      if (event.target.closest("button") || dragCompleted) return;
       openKanbanPlanner(card.dataset.plannerProposal);
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", event => {
+      if (canWrite() && event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const proposal = byId("proposals", card.dataset.plannerProposal);
+        const currentIndex = workflowStages.indexOf(proposal?.workflowStage);
+        const nextIndex = currentIndex + (event.key === "ArrowRight" ? 1 : -1);
+        const nextStage = workflowStages[nextIndex];
+        if (nextStage) moveProposalToStage(card.dataset.plannerProposal, nextStage);
+        return;
+      }
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         open(event);
       }
     });
-  });
-  scope.querySelectorAll("[data-open-planner]").forEach(button => {
-    button.addEventListener("click", () => openKanbanPlanner(button.dataset.openPlanner));
-  });
-  scope.querySelectorAll("[data-stage]").forEach(button => {
-    button.addEventListener("click", async () => {
-      const proposal = byId("proposals", button.dataset.stage);
-      if (!proposal) return;
-      const currentStage = workflowStages.includes(proposal.workflowStage) ? proposal.workflowStage : "Em confeccao";
-      const nextIndex = workflowStages.indexOf(currentStage) + Number(button.dataset.direction);
-      const nextStage = workflowStages[nextIndex];
-      if (!nextStage) return;
-      try {
-        await api(`/api/proposals/${proposal.id}`, {
-          method: "PUT",
-          body: JSON.stringify({ ...proposal, workflowStage: nextStage })
-        });
-        toast(`Proposta movida para ${workflowLabels[nextStage]}.`);
-        await reload();
-        navigate("/kanban", true);
-      } catch (error) {
-        toast(error.message);
-      }
+
+    if (!canWrite()) return;
+    card.addEventListener("dragstart", event => {
+      draggedProposalId = card.dataset.plannerProposal;
+      dragCompleted = false;
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedProposalId);
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("is-dragging");
+      scope.querySelectorAll(".is-drop-target").forEach(item => item.classList.remove("is-drop-target"));
+      draggedProposalId = null;
+      window.setTimeout(() => {
+        dragCompleted = false;
+      }, 0);
     });
   });
+
+  scope.querySelectorAll("[data-kanban-dropzone]").forEach(dropzone => {
+    if (!canWrite()) return;
+    dropzone.addEventListener("dragover", event => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      dropzone.closest(".kanban-column")?.classList.add("is-drop-target");
+    });
+    dropzone.addEventListener("dragleave", event => {
+      if (!dropzone.contains(event.relatedTarget)) {
+        dropzone.closest(".kanban-column")?.classList.remove("is-drop-target");
+      }
+    });
+    dropzone.addEventListener("drop", async event => {
+      event.preventDefault();
+      dragCompleted = true;
+      const proposalId = draggedProposalId || event.dataTransfer.getData("text/plain");
+      const nextStage = dropzone.dataset.kanbanDropzone;
+      scope.querySelectorAll(".is-drop-target").forEach(item => item.classList.remove("is-drop-target"));
+      await moveProposalToStage(proposalId, nextStage);
+    });
+  });
+}
+
+async function moveProposalToStage(proposalId, nextStage) {
+  const proposal = byId("proposals", proposalId);
+  if (!proposal || !workflowStages.includes(nextStage) || proposal.workflowStage === nextStage) return;
+  try {
+    await api(`/api/proposals/${proposal.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...proposal, workflowStage: nextStage })
+    });
+    toast(`Proposta movida para ${workflowLabels[nextStage]}.`);
+    await reload();
+    navigate("/kanban", true);
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 function openKanbanPlanner(proposalId) {
