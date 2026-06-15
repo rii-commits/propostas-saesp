@@ -20,13 +20,14 @@ const routes = [
 
 const variables = ["empresa", "endereco", "evento", "data", "data_evento", "local", "valor", "responsavel", "responsavel_interno", "contrapartidas", "codigo", "conteudo"];
 const proposalStatuses = ["Rascunho", "Enviada", "Aprovada", "Recusada", "Cancelada", "Final"];
-const workflowStages = ["Em confeccao", "Proposta enviada", "Em formalizacao", "Em realizacao", "Finalizado"];
+const workflowStages = ["Em confeccao", "Proposta enviada", "Em formalizacao", "Em realizacao", "Finalizado", "Declinios"];
 const workflowLabels = {
   "Em confeccao": "Em confecção",
   "Proposta enviada": "Proposta enviada",
   "Em formalizacao": "Em formalização",
   "Em realizacao": "Em realização",
-  "Finalizado": "Finalizado"
+  "Finalizado": "Finalizado",
+  "Declinios": "Declínios"
 };
 
 function canWrite() {
@@ -617,10 +618,15 @@ function bindKanbanActions(scope) {
 async function moveProposalToStage(proposalId, nextStage) {
   const proposal = byId("proposals", proposalId);
   if (!proposal || !workflowStages.includes(nextStage) || proposal.workflowStage === nextStage) return;
+  const nextStatus = nextStage === "Declinios"
+    ? "Recusada"
+    : proposal.workflowStage === "Declinios" && proposal.status === "Recusada"
+      ? "Enviada"
+      : proposal.status;
   try {
     await api(`/api/proposals/${proposal.id}`, {
       method: "PUT",
-      body: JSON.stringify({ ...proposal, workflowStage: nextStage })
+      body: JSON.stringify({ ...proposal, workflowStage: nextStage, status: nextStatus })
     });
     toast(`Proposta movida para ${workflowLabels[nextStage]}.`);
     await reload();

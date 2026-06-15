@@ -470,7 +470,7 @@ tbody tr:nth-child(even) td {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(205px, 1fr));
+  grid-template-columns: repeat(6, minmax(205px, 1fr));
   gap: 10px;
   align-items: start;
   overflow-x: auto;
