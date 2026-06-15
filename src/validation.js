@@ -20,6 +20,19 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function normalizeControlCode(value) {
+  const text = normalizeText(value).toUpperCase();
+  const match = text.match(/^(?:C\s*)?(\d+)\s*[/-]\s*(\d{4})$/);
+  if (!match) {
+    throw new Error("Informe o codigo no formato C 070/2026.");
+  }
+  return {
+    controlCode: `C ${String(Number(match[1])).padStart(3, "0")}/${match[2]}`,
+    controlSequence: Number(match[1]),
+    controlYear: match[2]
+  };
+}
+
 function extractVariables(content) {
   return Array.from(String(content || "").matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)).map(match => match[1]);
 }
@@ -75,10 +88,8 @@ function sanitizeEntity(resource, body) {
   }
 
   if (resource === "proposals") {
-    delete base.controlCode;
-    delete base.controlSequence;
-    delete base.controlYear;
     delete base.issuedAt;
+    Object.assign(base, normalizeControlCode(base.controlCode));
     base.title = normalizeText(base.title);
     base.companyId = base.companyId || null;
     base.eventId = base.eventId || null;
@@ -164,6 +175,7 @@ module.exports = {
   buildProposalReplacements,
   fillTemplate,
   formatControlCode,
+  normalizeControlCode,
   proposalStatuses,
   proposalYear,
   sanitizeEntity,

@@ -5,7 +5,6 @@ const {
   createResource,
   deleteResource,
   loadAll,
-  reserveProposalCode,
   resourceCollection,
   updateResource
 } = require("./repository");
@@ -20,7 +19,7 @@ const {
 } = require("./auth");
 const { getConfig } = require("./config");
 const { parseBody, sendBuffer, sendJson } = require("./http");
-const { buildProposalReplacements, fillTemplate, proposalYear, sanitizeEntity } = require("./validation");
+const { buildProposalReplacements, fillTemplate, sanitizeEntity } = require("./validation");
 const { generateFromTemplateBuffer, generateGenericDocx, importCounterpartsDocx, importTemplateDocx } = require("./docx");
 const { downloadDocx, uploadDocx } = require("./storage");
 
@@ -128,9 +127,10 @@ async function handleGenerateDocx(req, res, db, proposalId, user) {
 async function handleCreate(resource, body, db, user) {
   const payload = sanitizeEntity(resource, body);
   if (resource === "proposals") {
-    const year = proposalYear(db, payload);
-    const code = await reserveProposalCode(year);
-    Object.assign(payload, code);
+    if (db.proposals.some(item => item.controlCode === payload.controlCode)) {
+      throw new Error(`O codigo ${payload.controlCode} ja esta em uso.`);
+    }
+    payload.issuedAt = new Date().toISOString();
     if (!payload.ownerId) payload.ownerId = user.id;
     if (!payload.content || payload.regenerateContent) payload.content = fillTemplate(db, payload);
   }
@@ -147,6 +147,9 @@ async function handleUpdate(resource, id, body, db, user) {
   const previous = db[resourceCollection(resource)].find(item => item.id === id);
   if (!previous) return null;
   const payload = sanitizeEntity(resource, body);
+  if (resource === "proposals" && db.proposals.some(item => item.id !== id && item.controlCode === payload.controlCode)) {
+    throw new Error(`O codigo ${payload.controlCode} ja esta em uso.`);
+  }
   if (resource === "proposals" && body.regenerateContent) {
     payload.content = fillTemplate(db, { ...previous, ...payload });
   }

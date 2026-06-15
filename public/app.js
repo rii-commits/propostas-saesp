@@ -1274,7 +1274,7 @@ function renderProposalForm(main, id = null) {
     <form class="panel" id="proposalForm">
       <input type="hidden" name="id" value="${escapeAttr(item?.id || "")}">
       <div class="form-grid three">
-        <label class="field"><span>Código de controle</span><input value="${escapeAttr(item?.controlCode || "Será gerado automaticamente")}" readonly></label>
+        <label class="field"><span>Código de controle</span><input name="controlCode" value="${escapeAttr(item?.controlCode || "")}" placeholder="Ex.: C 070/2026" inputmode="numeric" autocomplete="off" required ${!canWrite() ? "disabled" : ""}></label>
         ${input("title", "Título", item?.title, true)}
         ${select("companyId", "Empresa", state.data.companies, item?.companyId, "Selecione", true)}
         ${select("eventId", "Evento", state.data.events, item?.eventId, "Selecione", true)}
@@ -1413,6 +1413,7 @@ function readProposalForm(form, regenerateContent) {
   const data = new FormData(form);
   return {
     id: data.get("id"),
+    controlCode: data.get("controlCode"),
     title: data.get("title"),
     companyId: data.get("companyId"),
     eventId: data.get("eventId"),
