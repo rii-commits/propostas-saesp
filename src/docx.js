@@ -247,8 +247,8 @@ function paragraphXml(text) {
 function documentXmlFromContent(documentXml, content) {
   const bodyMatch = documentXml.match(/<w:body>([\s\S]*)<\/w:body>/);
   if (!bodyMatch) return null;
-  const sectPrMatch = bodyMatch[1].match(/<w:sectPr[\s\S]*<\/w:sectPr>/);
-  const sectPr = sectPrMatch ? sectPrMatch[0] : "";
+  const sectionProperties = bodyMatch[1].match(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g) || [];
+  const sectPr = sectionProperties.at(-1) || "";
   const paragraphs = String(content || "")
     .split(/\n{2,}/)
     .flatMap(block => block.split(/\n/))
