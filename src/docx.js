@@ -111,16 +111,10 @@ function replacePlaceholdersInXml(xml, replacements) {
 }
 
 function extractXmlParagraphs(documentXml) {
-  return documentXml
-    .split(/<\/w:p>/)
-    .map(paragraph => paragraph
-      .replace(/<w:tab\/>/g, "\t")
-      .replace(/<w:br\/>/g, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, "\"")
+  return (documentXml.match(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g) || [])
+    .map(paragraph => Array.from(paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g))
+      .map(match => decodeXml(match[1]))
+      .join("")
       .replace(/\s+/g, " ")
       .trim())
     .filter(Boolean);
@@ -244,17 +238,51 @@ function paragraphXml(text) {
   return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
 }
 
-function documentXmlFromContent(documentXml, content) {
-  const bodyMatch = documentXml.match(/<w:body>([\s\S]*)<\/w:body>/);
-  if (!bodyMatch) return null;
-  const sectionProperties = bodyMatch[1].match(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g) || [];
-  const sectPr = sectionProperties.at(-1) || "";
-  const paragraphs = String(content || "")
-    .split(/\n{2,}/)
-    .flatMap(block => block.split(/\n/))
-    .map(paragraphXml)
+function paragraphText(paragraph) {
+  return Array.from(paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g))
+    .map(match => decodeXml(match[1]))
     .join("");
-  return documentXml.replace(/<w:body>[\s\S]*<\/w:body>/, `<w:body>${paragraphs}${sectPr}</w:body>`);
+}
+
+function replaceParagraphText(paragraph, text) {
+  let index = 0;
+  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, () => {
+    index += 1;
+    return index === 1 ? textElements(text) : "<w:t></w:t>";
+  });
+}
+
+function cleanContentParagraphs(content) {
+  return String(content || "")
+    .split(/\n{2,}/)
+    .map(text => text
+      .replace(/\d{10,}/g, "")
+      .replace(/\s+/g, " ")
+      .trim())
+    .filter(text => text && !/^\d{1,3}$/.test(text));
+}
+
+function documentXmlFromContent(documentXml, content) {
+  const bodyMatch = documentXml.match(/<w:body\b[^>]*>([\s\S]*)<\/w:body>/);
+  if (!bodyMatch) return null;
+  const contentParagraphs = cleanContentParagraphs(content);
+  let contentIndex = 0;
+  const nextBody = bodyMatch[1].replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
+    if (!paragraphText(paragraph).trim()) return paragraph;
+    const nextText = contentParagraphs[contentIndex] || "";
+    contentIndex += 1;
+    return replaceParagraphText(paragraph, nextText);
+  });
+
+  if (contentIndex < contentParagraphs.length) {
+    const remaining = contentParagraphs.slice(contentIndex).map(paragraphXml).join("");
+    const sectionStart = nextBody.lastIndexOf("<w:sectPr");
+    const bodyWithRemaining = sectionStart >= 0
+      ? `${nextBody.slice(0, sectionStart)}${remaining}${nextBody.slice(sectionStart)}`
+      : `${nextBody}${remaining}`;
+    return documentXml.replace(bodyMatch[1], bodyWithRemaining);
+  }
+  return documentXml.replace(bodyMatch[1], nextBody);
 }
 
 async function generateGenericDocx(proposal, replacements) {

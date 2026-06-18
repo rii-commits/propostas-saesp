@@ -82,6 +82,7 @@ function fmtLongDate(value = new Date()) {
 }
 
 function localProposalCode(payload) {
+  if (payload.controlCode) return payload.controlCode;
   const existing = byId("proposals", payload.id);
   if (existing?.controlCode) return existing.controlCode;
   const year = String(new Date().getFullYear());
