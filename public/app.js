@@ -432,15 +432,15 @@ function renderDashboard(main) {
     <section class="metric-grid">
       <div class="metric"><span>Empresas</span><strong>${state.data.companies.length}</strong></div>
       <div class="metric"><span>Eventos</span><strong>${state.data.events.length}</strong></div>
-      <div class="metric"><span>Rascunhos</span><strong>${proposals.filter(item => item.status === "Rascunho").length}</strong></div>
-      <div class="metric"><span>Finais</span><strong>${proposals.filter(item => item.status === "Final").length}</strong></div>
       <div class="metric financial" title="Propostas que já saíram da etapa Em confecção"><span>Valor em propostas enviadas</span><strong>${money(sentValue)}</strong></div>
       <div class="metric financial converted" title="Propostas em formalização, realização ou finalizadas"><span>Valor em propostas convertidas</span><strong>${money(convertedValue)}</strong></div>
     </section>
     ${proposalFilters()}
+    ${proposalReportTools(filtered)}
     ${proposalTable(filtered)}
   `;
   bindProposalFilters(main);
+  bindDashboardReportActions(main);
   bindProposalActions(main);
 }
 
@@ -466,10 +466,182 @@ function bindProposalFilters(main) {
     const input = main.querySelector(`#${id}`);
     if (input) input.addEventListener("input", () => {
       const wrap = main.querySelector("#proposalTableWrap");
-      wrap.outerHTML = proposalTable(filterProposals(enrichedProposals()));
+      const filtered = filterProposals(enrichedProposals());
+      wrap.outerHTML = proposalTable(filtered);
+      updateProposalReportTools(main, filtered);
       bindProposalActions(main);
     });
   });
+}
+
+function proposalReportTools(items) {
+  const total = items.reduce((sum, item) => sum + parseMoneyValue(item.value), 0);
+  return `
+    <section class="report-toolbar" id="proposalReportTools">
+      <div class="report-summary">
+        <strong id="proposalReportCount">${items.length} ${items.length === 1 ? "proposta" : "propostas"}</strong>
+        <span id="proposalReportTotal">Total filtrado: ${money(total)}</span>
+      </div>
+      <div class="report-actions">
+        <button class="btn" type="button" id="exportProposalCsv">Excel / CSV</button>
+        <button class="btn primary" type="button" id="printProposalReport">Imprimir / PDF</button>
+      </div>
+    </section>
+  `;
+}
+
+function updateProposalReportTools(scope, items) {
+  const count = scope.querySelector("#proposalReportCount");
+  const total = scope.querySelector("#proposalReportTotal");
+  if (!count || !total) return;
+  count.textContent = `${items.length} ${items.length === 1 ? "proposta" : "propostas"}`;
+  total.textContent = `Total filtrado: ${money(items.reduce((sum, item) => sum + parseMoneyValue(item.value), 0))}`;
+}
+
+function bindDashboardReportActions(scope) {
+  scope.querySelector("#exportProposalCsv")?.addEventListener("click", exportProposalCsv);
+  scope.querySelector("#printProposalReport")?.addEventListener("click", printProposalReport);
+}
+
+function proposalReportRows() {
+  return filterProposals(enrichedProposals());
+}
+
+function activeProposalFilters() {
+  const values = [
+    ["Busca", document.getElementById("filterSearch")?.value],
+    ["Empresa", document.getElementById("filterCompany")?.selectedOptions?.[0]?.text],
+    ["Evento", document.getElementById("filterEvent")?.selectedOptions?.[0]?.text],
+    ["Status", document.getElementById("filterStatus")?.value],
+    ["Responsável", document.getElementById("filterOwner")?.selectedOptions?.[0]?.text]
+  ];
+  return values.filter(([, value]) => value && !["Todas", "Todos"].includes(value));
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function exportProposalCsv() {
+  const items = proposalReportRows();
+  if (!items.length) {
+    toast("Não há propostas para exportar com os filtros atuais.");
+    return;
+  }
+
+  const headings = ["Código", "Título", "Empresa", "Evento", "Status", "Etapa", "Responsável", "Valor (R$)", "Atualização"];
+  const rows = items.map(item => [
+    item.controlCode || "Pendente",
+    item.title,
+    item.companyName,
+    item.eventName,
+    item.status,
+    workflowLabels[item.workflowStage] || item.workflowStage,
+    item.ownerName,
+    parseMoneyValue(item.value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    fmtDate(item.updatedAt?.slice(0, 10))
+  ]);
+  const csv = `sep=;\r\n${[headings, ...rows].map(row => row.map(csvCell).join(";")).join("\r\n")}`;
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `relatorio-propostas-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  toast("Relatório para Excel gerado.");
+}
+
+function printProposalReport() {
+  const items = proposalReportRows();
+  if (!items.length) {
+    toast("Não há propostas para gerar o relatório.");
+    return;
+  }
+
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    toast("Permita pop-ups para abrir o relatório em PDF.");
+    return;
+  }
+
+  const total = items.reduce((sum, item) => sum + parseMoneyValue(item.value), 0);
+  const filters = activeProposalFilters();
+  const generatedAt = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  const filterText = filters.length
+    ? filters.map(([label, value]) => `<span><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</span>`).join("")
+    : "<span>Todos os registros</span>";
+
+  reportWindow.addEventListener("load", () => {
+    reportWindow.focus();
+    reportWindow.print();
+  }, { once: true });
+  reportWindow.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8">
+        <title>Relatório de propostas</title>
+        <style>
+          @page { size: landscape; margin: 12mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #172033; font: 12px Arial, sans-serif; }
+          header { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 3px solid #194a83; padding-bottom: 12px; }
+          header img { width: 100px; height: auto; }
+          h1 { margin: 0 0 4px; font-size: 22px; color: #194a83; }
+          p { margin: 0; color: #667085; }
+          .summary { display: flex; gap: 12px; margin: 16px 0; }
+          .summary div { min-width: 180px; border: 1px solid #d9e0ea; border-radius: 6px; padding: 10px 12px; }
+          .summary span { display: block; color: #667085; font-size: 10px; text-transform: uppercase; }
+          .summary strong { display: block; margin-top: 5px; font-size: 17px; }
+          .filters { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; color: #475467; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #d9e0ea; padding: 7px; text-align: left; vertical-align: top; }
+          th { background: #78c2c8; color: #123f70; font-size: 10px; text-transform: uppercase; }
+          tbody tr:nth-child(even) { background: #f8fafc; }
+          .value { white-space: nowrap; }
+          footer { margin-top: 12px; color: #667085; font-size: 10px; }
+          @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div>
+            <h1>Relatório de propostas comerciais</h1>
+            <p>Gerado em ${escapeHtml(generatedAt)}</p>
+          </div>
+          <img src="${escapeAttr(`${location.origin}/saesp-logo.png`)}" alt="SAESP">
+        </header>
+        <section class="summary">
+          <div><span>Propostas</span><strong>${items.length}</strong></div>
+          <div><span>Valor total filtrado</span><strong>${escapeHtml(money(total))}</strong></div>
+        </section>
+        <section class="filters">${filterText}</section>
+        <table>
+          <thead>
+            <tr><th>Código</th><th>Título</th><th>Empresa</th><th>Evento</th><th>Status</th><th>Etapa</th><th>Responsável</th><th>Valor</th><th>Atualização</th></tr>
+          </thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${escapeHtml(item.controlCode || "Pendente")}</td>
+                <td>${escapeHtml(item.title)}</td>
+                <td>${escapeHtml(item.companyName)}</td>
+                <td>${escapeHtml(item.eventName)}</td>
+                <td>${escapeHtml(item.status)}</td>
+                <td>${escapeHtml(workflowLabels[item.workflowStage] || item.workflowStage)}</td>
+                <td>${escapeHtml(item.ownerName)}</td>
+                <td class="value">${escapeHtml(money(item.value))}</td>
+                <td>${escapeHtml(fmtDate(item.updatedAt?.slice(0, 10)))}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        <footer>Plataforma de Propostas SAESP</footer>
+      </body>
+    </html>`);
+  reportWindow.document.close();
 }
 
 function filterProposals(items) {
