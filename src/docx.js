@@ -54,30 +54,59 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function decodeXml(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'");
 }
 
-function xmlTextWithBreaks(value) {
-  const lines = String(value ?? "").split(/\r?\n/);
-  return lines.map((line, index) => `${index ? "<w:br/>" : ""}${escapeXml(line)}`).join("");
+function textElements(value) {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map(line => `<w:t xml:space="preserve">${escapeXml(line)}</w:t>`)
+    .join("<w:br/>");
 }
 
-function placeholderXmlPattern(variable) {
-  const chars = `{{${variable}}}`.split("").map(escapeRegex);
-  return new RegExp(chars.join("(?:<[^>]+>)*"), "g");
+function replaceTextPlaceholders(text, replacements) {
+  let next = text;
+  let changed = false;
+  for (const [key, value] of Object.entries(replacements)) {
+    const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
+    if (!pattern.test(next)) continue;
+    pattern.lastIndex = 0;
+    next = next.replace(pattern, String(value ?? ""));
+    changed = true;
+  }
+  return { text: next, changed };
+}
+
+function replacePlaceholdersInParagraph(paragraphXml, replacements) {
+  const textPattern = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+  const matches = Array.from(paragraphXml.matchAll(textPattern));
+  if (!matches.length) return { xml: paragraphXml, changed: false };
+
+  const fullText = matches.map(match => decodeXml(match[1])).join("");
+  const replaced = replaceTextPlaceholders(fullText, replacements);
+  if (!replaced.changed) return { xml: paragraphXml, changed: false };
+
+  let textIndex = 0;
+  const next = paragraphXml.replace(textPattern, () => {
+    textIndex += 1;
+    return textIndex === 1 ? textElements(replaced.text) : "<w:t></w:t>";
+  });
+  return { xml: next, changed: true };
 }
 
 function replacePlaceholdersInXml(xml, replacements) {
-  let next = xml;
   let changed = false;
-  for (const [key, value] of Object.entries(replacements)) {
-    const pattern = placeholderXmlPattern(key);
-    next = next.replace(pattern, () => {
-      changed = true;
-      return xmlTextWithBreaks(value);
-    });
-  }
+  const next = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
+    const replaced = replacePlaceholdersInParagraph(paragraph, replacements);
+    if (replaced.changed) changed = true;
+    return replaced.xml;
+  });
   return { xml: next, changed };
 }
 
