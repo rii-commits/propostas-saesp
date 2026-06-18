@@ -3,9 +3,11 @@ const {
   addProposalNote,
   addVersion,
   createResource,
+  deleteProposalNote,
   deleteResource,
   loadAll,
   resourceCollection,
+  updateProposalNote,
   updateResource
 } = require("./repository");
 const {
@@ -242,6 +244,23 @@ async function handleApi(req, res) {
       const note = await addProposalNote(proposal, body.content, user);
       if (!note) return sendJson(res, 400, { error: "Informe uma observacao para salvar." });
       return sendJson(res, 201, note);
+    }
+
+    if (segments[0] === "api" && segments[1] === "proposals" && segments[3] === "notes" && segments[4]) {
+      if (!canWrite(user)) return forbidden(res);
+      const proposal = db.proposals.find(item => item.id === segments[2]);
+      if (!proposal) return notFound(res);
+      if (req.method === "PUT") {
+        const body = await parseBody(req);
+        const note = await updateProposalNote(proposal, segments[4], body.content, user);
+        if (!note) return sendJson(res, 404, { error: "Observacao nao encontrada ou vazia." });
+        return sendJson(res, 200, note);
+      }
+      if (req.method === "DELETE") {
+        const note = await deleteProposalNote(proposal, segments[4], user);
+        if (!note) return notFound(res);
+        return sendJson(res, 200, note);
+      }
     }
 
     if (segments[0] !== "api") return notFound(res);

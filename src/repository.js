@@ -256,15 +256,84 @@ async function addProposalNote(proposal, content, user) {
   return toClient("proposalNotes", row);
 }
 
+async function updateProposalNote(proposal, noteId, content, user) {
+  const note = String(content || "").trim();
+  if (!proposal || !note) return null;
+  const previous = await checked(
+    getServiceClient()
+      .from("proposal_notes")
+      .select("*")
+      .eq("id", noteId)
+      .eq("proposal_id", proposal.id)
+      .maybeSingle()
+  );
+  if (!previous) return null;
+
+  const row = await checked(
+    getServiceClient()
+      .from("proposal_notes")
+      .update({ content: note })
+      .eq("id", noteId)
+      .eq("proposal_id", proposal.id)
+      .select("*")
+      .single()
+  );
+  await checked(getServiceClient().from("proposal_change_logs").insert(toDb("proposalChangeLogs", {
+    proposalId: proposal.id,
+    controlCode: proposal.controlCode || "",
+    proposalTitle: proposal.title || "",
+    companyId: proposal.companyId || "",
+    companyName: "",
+    eventId: proposal.eventId || "",
+    eventName: "",
+    action: "Observacao editada",
+    changedById: user?.id || "",
+    changedByName: user?.name || "Sistema",
+    changes: [{ field: "note", label: "Observacao", from: previous.content, to: note }]
+  })).select("*").single());
+  return toClient("proposalNotes", row);
+}
+
+async function deleteProposalNote(proposal, noteId, user) {
+  if (!proposal) return null;
+  const row = await checked(
+    getServiceClient()
+      .from("proposal_notes")
+      .delete()
+      .eq("id", noteId)
+      .eq("proposal_id", proposal.id)
+      .select("*")
+      .maybeSingle()
+  );
+  if (!row) return null;
+
+  await checked(getServiceClient().from("proposal_change_logs").insert(toDb("proposalChangeLogs", {
+    proposalId: proposal.id,
+    controlCode: proposal.controlCode || "",
+    proposalTitle: proposal.title || "",
+    companyId: proposal.companyId || "",
+    companyName: "",
+    eventId: proposal.eventId || "",
+    eventName: "",
+    action: "Observacao excluida",
+    changedById: user?.id || "",
+    changedByName: user?.name || "Sistema",
+    changes: [{ field: "note", label: "Observacao", from: row.content, to: "Excluida" }]
+  })).select("*").single());
+  return toClient("proposalNotes", row);
+}
+
 module.exports = {
   addProposalChangeLog,
   addProposalNote,
   addVersion,
   createResource,
+  deleteProposalNote,
   deleteResource,
   listCollection,
   loadAll,
   reserveProposalCode,
   resourceCollection,
+  updateProposalNote,
   updateResource
 };

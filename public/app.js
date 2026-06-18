@@ -489,17 +489,39 @@ function filterProposals(items) {
   });
 }
 
+function noteAgeInDays(createdAt) {
+  if (!createdAt) return null;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return null;
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const createdStart = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+  return Math.max(0, Math.floor((todayStart - createdStart) / 86400000));
+}
+
 function enrichedProposals() {
-  return state.data.proposals.map(item => ({
-    ...item,
-    workflowStage: workflowStages.includes(item.workflowStage) ? item.workflowStage : "Em confeccao",
-    controlCode: item.controlCode || "Pendente",
-    controlYear: item.controlYear || String(item.issuedAt || item.createdAt || "").slice(0, 4),
-    noteCount: (state.data.proposalNotes || []).filter(note => note.proposalId === item.id).length,
-    companyName: byId("companies", item.companyId)?.name || "Sem empresa",
-    eventName: byId("events", item.eventId)?.name || "Sem evento",
-    ownerName: byId("users", item.ownerId)?.name || "Sem responsável"
-  }));
+  return state.data.proposals.map(item => {
+    const notes = (state.data.proposalNotes || [])
+      .filter(note => note.proposalId === item.id)
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const followUpDays = noteAgeInDays(notes[0]?.createdAt);
+    const workflowStage = workflowStages.includes(item.workflowStage) ? item.workflowStage : "Em confeccao";
+    return {
+      ...item,
+      workflowStage,
+      controlCode: item.controlCode || "Pendente",
+      controlYear: item.controlYear || String(item.issuedAt || item.createdAt || "").slice(0, 4),
+      noteCount: notes.length,
+      latestNoteAt: notes[0]?.createdAt || "",
+      followUpDays,
+      followUpOverdue: followUpDays !== null
+        && followUpDays >= 5
+        && !["Finalizado", "Declinios"].includes(workflowStage),
+      companyName: byId("companies", item.companyId)?.name || "Sem empresa",
+      eventName: byId("events", item.eventId)?.name || "Sem evento",
+      ownerName: byId("users", item.ownerId)?.name || "Sem responsável"
+    };
+  });
 }
 
 function renderKanban(main) {
@@ -529,7 +551,7 @@ function renderKanban(main) {
 
 function kanbanCard(item) {
   return `
-    <article class="kanban-card" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
+    <article class="kanban-card ${item.followUpOverdue ? "follow-up-overdue" : ""}" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
       <div class="kanban-card-title">
         <strong>${escapeHtml(item.title)}</strong>
         <span class="badge ${item.status === "Final" ? "final" : "draft"}">${item.status}</span>
@@ -540,7 +562,10 @@ function kanbanCard(item) {
         <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
         <span>${escapeHtml(item.ownerName)}</span>
       </div>
-      <div class="kanban-note-count">${item.noteCount ? `${item.noteCount} observações` : "Sem observações"}</div>
+      <div class="kanban-follow-up-row">
+        <div class="kanban-note-count">${item.noteCount ? `${item.noteCount} observações` : "Sem observações"}</div>
+        ${item.followUpOverdue ? `<span class="follow-up-alert">Follow-up há ${item.followUpDays} dias</span>` : ""}
+      </div>
       <div class="kanban-card-actions">
         <button class="kanban-edit" data-edit-proposal="${item.id}" type="button">Editar</button>
       </div>
@@ -675,9 +700,15 @@ function openKanbanPlanner(proposalId) {
       <div class="planner-notes">
         <h3>Histórico de observações</h3>
         ${notes.length ? notes.map(note => `
-          <article class="planner-note">
-            <div><strong>${escapeHtml(note.createdByName || "Sistema")}</strong><span>${escapeHtml(fmtDateTime(note.createdAt))}</span></div>
+          <article class="planner-note" data-note-id="${note.id}">
+            <div class="planner-note-header"><strong>${escapeHtml(note.createdByName || "Sistema")}</strong><span>${escapeHtml(fmtDateTime(note.createdAt))}</span></div>
             <p>${escapeHtml(note.content)}</p>
+            ${canWrite() ? `
+              <div class="planner-note-actions">
+                <button class="note-action" type="button" data-edit-note="${note.id}">Editar</button>
+                <button class="note-action danger-text" type="button" data-delete-note="${note.id}">Excluir</button>
+              </div>
+            ` : ""}
           </article>
         `).join("") : `<div class="empty">Nenhuma observação registrada para esta proposta.</div>`}
       </div>
@@ -705,6 +736,57 @@ function openKanbanPlanner(proposalId) {
     } catch (error) {
       toast(error.message);
     }
+  });
+  overlay.querySelectorAll("[data-edit-note]").forEach(button => {
+    button.addEventListener("click", () => {
+      const note = notes.find(item => item.id === button.dataset.editNote);
+      const article = button.closest(".planner-note");
+      if (!note || !article) return;
+      article.classList.add("is-editing");
+      article.innerHTML = `
+        <textarea class="note-edit-textarea">${escapeHtml(note.content)}</textarea>
+        <div class="planner-note-actions">
+          <button class="note-action" type="button" data-cancel-note>Cancelar</button>
+          <button class="btn primary" type="button" data-save-note>Salvar alteração</button>
+        </div>
+      `;
+      article.querySelector("[data-cancel-note]").addEventListener("click", () => {
+        close();
+        openKanbanPlanner(proposalId);
+      });
+      article.querySelector("[data-save-note]").addEventListener("click", async () => {
+        const content = article.querySelector(".note-edit-textarea").value;
+        try {
+          await api(`/api/proposals/${proposalId}/notes/${note.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ content })
+          });
+          toast("Observação atualizada.");
+          close();
+          await reload();
+          openKanbanPlanner(proposalId);
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+      article.querySelector(".note-edit-textarea").focus();
+    });
+  });
+  overlay.querySelectorAll("[data-delete-note]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (!confirm("Excluir esta observação?")) return;
+      try {
+        await api(`/api/proposals/${proposalId}/notes/${button.dataset.deleteNote}`, {
+          method: "DELETE"
+        });
+        toast("Observação excluída.");
+        close();
+        await reload();
+        openKanbanPlanner(proposalId);
+      } catch (error) {
+        toast(error.message);
+      }
+    });
   });
   overlay.querySelector("textarea")?.focus();
 }
