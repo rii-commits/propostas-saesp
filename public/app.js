@@ -387,7 +387,7 @@ function renderApp() {
   });
 
   const main = document.getElementById("main");
-  if (active === "/dashboard") renderDashboard(main);
+  if (active === "/dashboard") renderDashboardV2(main);
   else if (active === "/kanban") renderKanban(main);
   else if (active === "/empresas") renderCrud(main, companyConfig());
   else if (active === "/eventos") renderCrud(main, eventConfig());
@@ -421,12 +421,20 @@ function renderDashboard(main) {
   const filtered = filterProposals(proposals);
   const sentStages = workflowStages.filter(stage => stage !== "Em confeccao");
   const convertedStages = ["Em formalizacao", "Em realizacao", "Finalizado"];
+  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage));
+  const convertedItems = proposals.filter(item => convertedStages.includes(item.workflowStage));
+  const acceptedItems = proposals.filter(item => ["Aprovada", "Final"].includes(item.status) || convertedStages.includes(item.workflowStage));
   const sentValue = proposals
     .filter(item => sentStages.includes(item.workflowStage))
     .reduce((total, item) => total + parseMoneyValue(item.value), 0);
   const convertedValue = proposals
     .filter(item => convertedStages.includes(item.workflowStage))
     .reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const acceptedValue = acceptedItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const conversionRate = sentItems.length ? Math.round((acceptedItems.length / sentItems.length) * 100) : 0;
+  const recentItems = [...proposals]
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 5);
   main.innerHTML = `
     ${pageHeader("Dashboard", "Busca e acompanhamento das propostas comerciais.")}
     <section class="metric-grid">
@@ -442,6 +450,178 @@ function renderDashboard(main) {
   bindProposalFilters(main);
   bindDashboardReportActions(main);
   bindProposalActions(main);
+}
+
+function renderDashboardV2(main) {
+  const proposals = enrichedProposals();
+  const sentStages = workflowStages.filter(stage => stage !== "Em confeccao");
+  const convertedStages = ["Em formalizacao", "Em realizacao", "Finalizado"];
+  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage));
+  const convertedItems = proposals.filter(item => convertedStages.includes(item.workflowStage));
+  const acceptedItems = proposals.filter(item => ["Aprovada", "Final"].includes(item.status) || convertedStages.includes(item.workflowStage));
+  const sentValue = sentItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const convertedValue = convertedItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const acceptedValue = acceptedItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const conversionRate = sentItems.length ? Math.round((acceptedItems.length / sentItems.length) * 100) : 0;
+  const recentItems = [...proposals]
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 5);
+
+  main.innerHTML = `
+    ${pageHeader("Dashboard", "Indicadores comerciais e conversao das propostas.")}
+    <section class="dashboard-kpis">
+      <div class="dashboard-kpi sent">
+        <span>Propostas enviadas</span>
+        <strong>${sentItems.length}</strong>
+        <small>${money(sentValue)} em negociacao</small>
+      </div>
+      <div class="dashboard-kpi accepted">
+        <span>Propostas aceitas</span>
+        <strong>${acceptedItems.length}</strong>
+        <small>${money(acceptedValue)} convertidos</small>
+      </div>
+      <div class="dashboard-kpi rate">
+        <span>Taxa de conversao</span>
+        <strong>${conversionRate}%</strong>
+        <small>${convertedItems.length} em formalizacao ou alem</small>
+      </div>
+      <div class="dashboard-kpi neutral">
+        <span>Base ativa</span>
+        <strong>${state.data.companies.length}</strong>
+        <small>${state.data.events.length} eventos cadastrados</small>
+      </div>
+    </section>
+    <section class="dashboard-grid">
+      ${dashboardValueChart(sentValue, convertedValue)}
+      ${dashboardStageChart(proposals)}
+      ${dashboardStatusChart(proposals)}
+      ${dashboardRecentList(recentItems)}
+    </section>
+    <section class="dashboard-actions panel">
+      <div>
+        <strong>${proposals.length} propostas no total</strong>
+        <span>Use a tela Propostas para filtros detalhados, CSV e relatorios.</span>
+      </div>
+      <div class="report-actions">
+        <button class="btn" type="button" id="exportProposalCsv">Excel / CSV</button>
+        <button class="btn primary" type="button" id="printProposalReport">Imprimir / PDF</button>
+      </div>
+    </section>
+  `;
+  bindDashboardReportActions(main);
+  bindProposalActions(main);
+}
+
+function dashboardValueChart(sentValue, convertedValue) {
+  const maxValue = Math.max(sentValue, convertedValue, 1);
+  const sentWidth = Math.max(4, Math.round((sentValue / maxValue) * 100));
+  const convertedWidth = Math.max(4, Math.round((convertedValue / maxValue) * 100));
+  return `
+    <article class="dashboard-card wide">
+      <div class="dashboard-card-header">
+        <div>
+          <span>Volume financeiro</span>
+          <h2>Enviadas x convertidas</h2>
+        </div>
+      </div>
+      <div class="horizontal-chart">
+        <div class="chart-row">
+          <div><strong>Enviadas</strong><span>${escapeHtml(money(sentValue))}</span></div>
+          <i style="--bar-width:${sentWidth}%"></i>
+        </div>
+        <div class="chart-row converted">
+          <div><strong>Convertidas</strong><span>${escapeHtml(money(convertedValue))}</span></div>
+          <i style="--bar-width:${convertedWidth}%"></i>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function dashboardStageChart(proposals) {
+  const maxCount = Math.max(...workflowStages.map(stage => proposals.filter(item => item.workflowStage === stage).length), 1);
+  return `
+    <article class="dashboard-card">
+      <div class="dashboard-card-header">
+        <div>
+          <span>Pipeline</span>
+          <h2>Propostas por etapa</h2>
+        </div>
+      </div>
+      <div class="stage-bars">
+        ${workflowStages.map(stage => {
+          const count = proposals.filter(item => item.workflowStage === stage).length;
+          const width = Math.max(4, Math.round((count / maxCount) * 100));
+          return `
+            <div class="stage-bar">
+              <div><strong>${escapeHtml(workflowLabels[stage] || stage)}</strong><span>${count}</span></div>
+              <i style="--bar-width:${width}%"></i>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function dashboardStatusChart(proposals) {
+  const statusCounts = proposalStatuses.map(status => ({
+    status,
+    count: proposals.filter(item => item.status === status).length
+  })).filter(item => item.count);
+  const total = Math.max(proposals.length, 1);
+  let cursor = 0;
+  const colors = ["#14427d", "#78c2c8", "#2f855a", "#b42318", "#7a5af8", "#e3541e"];
+  const gradient = statusCounts.length
+    ? statusCounts.map((item, index) => {
+      const start = cursor;
+      cursor += (item.count / total) * 100;
+      return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+    }).join(", ")
+    : "#dfe3ea 0% 100%";
+
+  return `
+    <article class="dashboard-card">
+      <div class="dashboard-card-header">
+        <div>
+          <span>Status</span>
+          <h2>Distribuicao geral</h2>
+        </div>
+      </div>
+      <div class="status-chart">
+        <div class="donut" style="--donut: conic-gradient(${gradient})"><strong>${proposals.length}</strong><span>propostas</span></div>
+        <div class="status-legend">
+          ${statusCounts.map((item, index) => `
+            <span><i style="--legend-color:${colors[index % colors.length]}"></i>${escapeHtml(item.status)} <strong>${item.count}</strong></span>
+          `).join("") || `<span><i></i>Sem propostas <strong>0</strong></span>`}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function dashboardRecentList(items) {
+  return `
+    <article class="dashboard-card wide">
+      <div class="dashboard-card-header">
+        <div>
+          <span>Atualizacoes</span>
+          <h2>Propostas recentes</h2>
+        </div>
+        <button class="btn" type="button" onclick="navigate('/propostas')">Ver propostas</button>
+      </div>
+      <div class="dashboard-recent-list">
+        ${items.length ? items.map(item => `
+          <button type="button" class="dashboard-recent-item" data-edit-proposal="${escapeAttr(item.id)}">
+            <span><strong>${escapeHtml(item.controlCode || "Pendente")}</strong>${escapeHtml(item.title)}</span>
+            <span>${escapeHtml(item.companyName || "Sem empresa")}</span>
+            <span><i class="badge workflow">${escapeHtml(workflowLabels[item.workflowStage] || item.workflowStage)}</i></span>
+            <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
+          </button>
+        `).join("") : `<div class="empty">Nenhuma proposta cadastrada.</div>`}
+      </div>
+    </article>
+  `;
 }
 
 function proposalFilters() {
