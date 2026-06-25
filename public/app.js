@@ -390,7 +390,7 @@ function renderApp() {
   if (active === "/dashboard") renderDashboardV2(main);
   else if (active === "/kanban") renderKanban(main);
   else if (active === "/empresas") renderCompanies(main);
-  else if (active === "/eventos") renderCrud(main, eventConfig());
+  else if (active === "/eventos") renderEvents(main);
   else if (active === "/modelos") renderCrud(main, templateConfig());
   else if (active === "/contrapartidas") renderCrud(main, counterpartConfig());
   else if (active === "/propostas/nova") renderProposalForm(main);
@@ -1538,6 +1538,113 @@ function bindCompanyGallerySearch(scope) {
       if (matches) visible += 1;
     });
     if (count) count.textContent = `${visible} ${visible === 1 ? "empresa" : "empresas"}`;
+  };
+  input?.addEventListener("input", applySearch);
+  applySearch();
+}
+
+function renderEvents(main) {
+  const config = eventConfig();
+  const rows = [...state.data.events].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+  const linkedEvents = rows.filter(event => event.companyId).length;
+  const scheduledEvents = rows.filter(event => event.date).length;
+  main.innerHTML = `
+    ${pageHeader("Eventos", "Galeria de cursos e atividades vinculados as propostas.", canWrite() ? `<button class="btn primary" id="newEventBtn">Novo evento</button>` : "")}
+    <section class="company-overview event-overview">
+      <div><span>Eventos cadastrados</span><strong>${rows.length}</strong></div>
+      <div><span>Com empresa vinculada</span><strong>${linkedEvents}</strong></div>
+      <div><span>Com data definida</span><strong>${scheduledEvents}</strong></div>
+    </section>
+    <section class="company-toolbar panel">
+      <label class="field"><span>Buscar evento</span><input id="eventGallerySearch" placeholder="Curso, empresa, local ou descricao"></label>
+      <div class="company-count" id="eventGalleryCount"></div>
+    </section>
+    <section class="panel hidden company-editor event-editor" id="formPanel">${config.form()}</section>
+    <section class="event-gallery" id="eventGallery">
+      ${eventGallery(rows)}
+    </section>
+  `;
+
+  const panel = main.querySelector("#formPanel");
+  main.querySelector("#newEventBtn")?.addEventListener("click", () => {
+    openEventEditor(panel, config);
+  });
+  bindEventCards(main, rows, config, panel);
+  bindEventGallerySearch(main);
+}
+
+function eventGallery(rows) {
+  if (!rows.length) return `<div class="empty">Nenhum evento cadastrado.</div>`;
+  return rows.map(event => eventCard(event)).join("");
+}
+
+function eventCard(event) {
+  const company = byId("companies", event.companyId);
+  const proposals = state.data.proposals.filter(proposal => proposal.eventId === event.id);
+  const searchText = [
+    event.name,
+    event.date,
+    event.location,
+    event.description,
+    company?.name
+  ].join(" ").toLowerCase();
+
+  return `
+    <button class="event-card" type="button" data-edit-event="${escapeAttr(event.id)}" data-search="${escapeAttr(searchText)}">
+      <span class="event-card-main">
+        <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
+        <small>${escapeHtml(company?.name || "Empresa nao vinculada")}</small>
+      </span>
+      <span class="event-card-details">
+        <span><b>Data</b>${escapeHtml(fmtDate(event.date) || "A definir")}</span>
+        <span><b>Local</b>${escapeHtml(event.location || "Local nao informado")}</span>
+        <span>${escapeHtml(event.description || "Sem descricao cadastrada")}</span>
+      </span>
+      <span class="company-card-footer">
+        <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
+        <i>${company?.name ? "Vinculado" : "Sem empresa"}</i>
+      </span>
+    </button>
+  `;
+}
+
+function openEventEditor(panel, config, item = null) {
+  panel.innerHTML = `
+    <div class="company-editor-header">
+      <div>
+        <span>${item ? "Editar evento" : "Novo evento"}</span>
+        <h2>${escapeHtml(item?.name || "Cadastro de evento")}</h2>
+      </div>
+    </div>
+    ${config.form(item)}
+  `;
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  bindCrudForm(config, panel, item);
+}
+
+function bindEventCards(scope, rows, config, panel) {
+  scope.querySelectorAll("[data-edit-event]").forEach(card => {
+    card.addEventListener("click", () => {
+      const item = rows.find(row => row.id === card.dataset.editEvent);
+      if (item) openEventEditor(panel, config, item);
+    });
+  });
+}
+
+function bindEventGallerySearch(scope) {
+  const input = scope.querySelector("#eventGallerySearch");
+  const count = scope.querySelector("#eventGalleryCount");
+  const cards = Array.from(scope.querySelectorAll("[data-edit-event]"));
+  const applySearch = () => {
+    const query = (input?.value || "").toLowerCase().trim();
+    let visible = 0;
+    cards.forEach(card => {
+      const matches = !query || card.dataset.search.includes(query);
+      card.classList.toggle("hidden", !matches);
+      if (matches) visible += 1;
+    });
+    if (count) count.textContent = `${visible} ${visible === 1 ? "evento" : "eventos"}`;
   };
   input?.addEventListener("input", applySearch);
   applySearch();
