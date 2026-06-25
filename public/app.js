@@ -389,7 +389,7 @@ function renderApp() {
   const main = document.getElementById("main");
   if (active === "/dashboard") renderDashboardV2(main);
   else if (active === "/kanban") renderKanban(main);
-  else if (active === "/empresas") renderCrud(main, companyConfig());
+  else if (active === "/empresas") renderCompanies(main);
   else if (active === "/eventos") renderCrud(main, eventConfig());
   else if (active === "/modelos") renderCrud(main, templateConfig());
   else if (active === "/contrapartidas") renderCrud(main, counterpartConfig());
@@ -1426,6 +1426,121 @@ async function downloadDocx(id) {
   } catch (error) {
     toast(error.message);
   }
+}
+
+function renderCompanies(main) {
+  const config = companyConfig();
+  const rows = [...state.data.companies].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+  const companiesWithContact = rows.filter(company => company.contactPerson || company.contacts).length;
+  const linkedProposals = new Set(state.data.proposals.map(proposal => proposal.companyId).filter(Boolean)).size;
+  main.innerHTML = `
+    ${pageHeader("Empresas", "Galeria de contas comerciais, contatos e historico de propostas.", canWrite() ? `<button class="btn primary" id="newCompanyBtn">Nova empresa</button>` : "")}
+    <section class="company-overview">
+      <div><span>Empresas cadastradas</span><strong>${rows.length}</strong></div>
+      <div><span>Com contato</span><strong>${companiesWithContact}</strong></div>
+      <div><span>Com propostas</span><strong>${linkedProposals}</strong></div>
+    </section>
+    <section class="company-toolbar panel">
+      <label class="field"><span>Buscar empresa</span><input id="companyGallerySearch" placeholder="Nome, responsavel, contato, endereco ou observacao"></label>
+      <div class="company-count" id="companyGalleryCount"></div>
+    </section>
+    <section class="panel hidden company-editor" id="formPanel">${config.form()}</section>
+    <section class="company-gallery" id="companyGallery">
+      ${companyGallery(rows)}
+    </section>
+  `;
+
+  const panel = main.querySelector("#formPanel");
+  main.querySelector("#newCompanyBtn")?.addEventListener("click", () => {
+    openCompanyEditor(panel, config);
+  });
+  bindCompanyCards(main, rows, config, panel);
+  bindCompanyGallerySearch(main);
+}
+
+function companyGallery(rows) {
+  if (!rows.length) return `<div class="empty">Nenhuma empresa cadastrada.</div>`;
+  return rows.map(company => companyCard(company)).join("");
+}
+
+function companyCard(company) {
+  const proposals = state.data.proposals.filter(proposal => proposal.companyId === company.id);
+  const events = state.data.events.filter(event => event.companyId === company.id);
+  const initials = String(company.name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join("")
+    .toUpperCase();
+  const searchText = [
+    company.name,
+    company.cnpj,
+    company.address,
+    company.contactPerson,
+    company.contacts,
+    company.notes
+  ].join(" ").toLowerCase();
+
+  return `
+    <button class="company-card" type="button" data-edit-company="${escapeAttr(company.id)}" data-search="${escapeAttr(searchText)}">
+      <span class="company-avatar">${escapeHtml(initials || "?")}</span>
+      <span class="company-card-main">
+        <strong>${escapeHtml(company.name || "Sem nome")}</strong>
+        <small>${escapeHtml(company.contactPerson || "Responsavel nao informado")}</small>
+      </span>
+      <span class="company-card-details">
+        <span>${escapeHtml(company.contacts || "Sem contato registrado")}</span>
+        <span>${escapeHtml(company.address || "Endereco nao informado")}</span>
+      </span>
+      <span class="company-card-footer">
+        <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
+        <i>${events.length} ${events.length === 1 ? "evento" : "eventos"}</i>
+      </span>
+    </button>
+  `;
+}
+
+function openCompanyEditor(panel, config, item = null) {
+  panel.innerHTML = `
+    <div class="company-editor-header">
+      <div>
+        <span>${item ? "Editar empresa" : "Nova empresa"}</span>
+        <h2>${escapeHtml(item?.name || "Cadastro de empresa")}</h2>
+      </div>
+    </div>
+    ${config.form(item)}
+  `;
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  bindCrudForm(config, panel, item);
+}
+
+function bindCompanyCards(scope, rows, config, panel) {
+  scope.querySelectorAll("[data-edit-company]").forEach(card => {
+    card.addEventListener("click", () => {
+      const item = rows.find(row => row.id === card.dataset.editCompany);
+      if (item) openCompanyEditor(panel, config, item);
+    });
+  });
+}
+
+function bindCompanyGallerySearch(scope) {
+  const input = scope.querySelector("#companyGallerySearch");
+  const count = scope.querySelector("#companyGalleryCount");
+  const cards = Array.from(scope.querySelectorAll("[data-edit-company]"));
+  const applySearch = () => {
+    const query = (input?.value || "").toLowerCase().trim();
+    let visible = 0;
+    cards.forEach(card => {
+      const matches = !query || card.dataset.search.includes(query);
+      card.classList.toggle("hidden", !matches);
+      if (matches) visible += 1;
+    });
+    if (count) count.textContent = `${visible} ${visible === 1 ? "empresa" : "empresas"}`;
+  };
+  input?.addEventListener("input", applySearch);
+  applySearch();
 }
 
 function renderCrud(main, config) {
