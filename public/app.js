@@ -906,20 +906,15 @@ function kanbanCard(item) {
     <article class="kanban-card ${item.followUpOverdue ? "follow-up-overdue" : ""}" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
       <div class="kanban-card-title">
         <strong>${escapeHtml(item.title)}</strong>
-        <span class="badge ${item.status === "Final" ? "final" : "draft"}">${item.status}</span>
       </div>
       <p class="kanban-company">${escapeHtml(item.companyName)}</p>
       <p class="muted">${escapeHtml(item.eventName)}</p>
       <div class="kanban-meta">
         <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
-        <span>${escapeHtml(item.ownerName)}</span>
       </div>
       <div class="kanban-follow-up-row">
         <div class="kanban-note-count">${item.noteCount ? `${item.noteCount} observações` : "Sem observações"}</div>
         ${item.followUpOverdue ? `<span class="follow-up-alert">Follow-up há ${item.followUpDays} dias</span>` : ""}
-      </div>
-      <div class="kanban-card-actions">
-        <button class="kanban-edit" data-edit-proposal="${item.id}" type="button">Editar</button>
       </div>
     </article>
   `;
