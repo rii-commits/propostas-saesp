@@ -759,14 +759,14 @@ textarea:disabled {
 
 .event-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 14px;
 }
 
 .event-card {
-  min-height: 218px;
+  min-height: 138px;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: 1fr auto;
   gap: 14px;
   width: 100%;
   padding: 18px;
@@ -789,46 +789,44 @@ textarea:disabled {
 
 .event-card-main {
   display: grid;
-  gap: 6px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.event-card-main strong {
-  color: var(--aqua);
-  font-size: 19px;
-  font-weight: 850;
-  line-height: 1.18;
-}
-
-.event-card-main small {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.event-card-details {
-  display: grid;
   align-content: start;
   gap: 8px;
 }
 
-.event-card-details span {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
+.event-card-main strong {
+  color: var(--aqua);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.18;
 }
 
-.event-card-details b {
-  display: inline-block;
-  min-width: 44px;
-  margin-right: 6px;
-  color: #344054;
+.event-proposal-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.event-proposal-count i {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(120, 194, 200, 0.2);
+  color: var(--brand);
   font-size: 12px;
-  text-transform: uppercase;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .event-editor {
   border-left-color: var(--brand);
+}
+
+.event-overview-bottom {
+  margin-top: 18px;
 }
 
 .filter-grid {

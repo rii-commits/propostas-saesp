@@ -9,7 +9,7 @@ const routes = [
   { path: "/dashboard", label: "Dashboard", icon: "⌂" },
   { path: "/kanban", label: "Kanban", icon: "▦" },
   { path: "/empresas", label: "Empresas", icon: "□" },
-  { path: "/eventos", label: "Eventos", icon: "◇" },
+  { path: "/eventos", label: "Eventos externos", icon: "◇" },
   { path: "/modelos", label: "Modelos", icon: "T" },
   { path: "/contrapartidas", label: "Contrapartidas", icon: "+" },
   { path: "/propostas", label: "Propostas", icon: "✎" },
@@ -1546,22 +1546,20 @@ function bindCompanyGallerySearch(scope) {
 function renderEvents(main) {
   const config = eventConfig();
   const rows = [...state.data.events].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
-  const linkedEvents = rows.filter(event => event.companyId).length;
-  const scheduledEvents = rows.filter(event => event.date).length;
+  const linkedProposals = state.data.proposals.filter(proposal => proposal.eventId).length;
   main.innerHTML = `
-    ${pageHeader("Eventos", "Galeria de cursos e atividades vinculados as propostas.", canWrite() ? `<button class="btn primary" id="newEventBtn">Novo evento</button>` : "")}
+    ${pageHeader("Eventos externos", "Cursos e atividades externas usados na criacao das propostas.", canWrite() ? `<button class="btn primary" id="newEventBtn">Novo evento externo</button>` : "")}
     <section class="company-toolbar panel">
-      <label class="field"><span>Buscar evento</span><input id="eventGallerySearch" placeholder="Curso, empresa, local ou descricao"></label>
+      <label class="field"><span>Buscar evento externo</span><input id="eventGallerySearch" placeholder="Nome do curso ou atividade"></label>
       <div class="company-count" id="eventGalleryCount"></div>
-    </section>
-    <section class="company-overview event-overview">
-      <div><span>Eventos cadastrados</span><strong>${rows.length}</strong></div>
-      <div><span>Com empresa vinculada</span><strong>${linkedEvents}</strong></div>
-      <div><span>Com data definida</span><strong>${scheduledEvents}</strong></div>
     </section>
     <section class="panel hidden company-editor event-editor" id="formPanel">${config.form()}</section>
     <section class="event-gallery" id="eventGallery">
       ${eventGallery(rows)}
+    </section>
+    <section class="company-overview event-overview event-overview-bottom">
+      <div><span>Eventos externos cadastrados</span><strong>${rows.length}</strong></div>
+      <div><span>Propostas vinculadas</span><strong>${linkedProposals}</strong></div>
     </section>
   `;
 
@@ -1579,30 +1577,19 @@ function eventGallery(rows) {
 }
 
 function eventCard(event) {
-  const company = byId("companies", event.companyId);
   const proposals = state.data.proposals.filter(proposal => proposal.eventId === event.id);
   const searchText = [
     event.name,
-    event.date,
-    event.location,
-    event.description,
-    company?.name
+    event.description
   ].join(" ").toLowerCase();
 
   return `
     <button class="event-card" type="button" data-edit-event="${escapeAttr(event.id)}" data-search="${escapeAttr(searchText)}">
       <span class="event-card-main">
         <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
-        <small>${escapeHtml(company?.name || "Empresa nao vinculada")}</small>
       </span>
-      <span class="event-card-details">
-        <span><b>Data</b>${escapeHtml(fmtDate(event.date) || "A definir")}</span>
-        <span><b>Local</b>${escapeHtml(event.location || "Local nao informado")}</span>
-        <span>${escapeHtml(event.description || "Sem descricao cadastrada")}</span>
-      </span>
-      <span class="company-card-footer">
+      <span class="event-proposal-count">
         <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
-        <i>${company?.name ? "Vinculado" : "Sem empresa"}</i>
       </span>
     </button>
   `;
@@ -1735,16 +1722,16 @@ function companyConfig() {
 
 function eventConfig() {
   return {
-    title: "Eventos",
-    subtitle: "Eventos vinculados a propostas e empresas.",
+    title: "Eventos externos",
+    subtitle: "Cursos e atividades externas usados nas propostas.",
     collection: "events",
     form: item => `
       <form class="form-grid">
         ${input("name", "Nome", item?.name, true)}
-        ${input("date", "Data", item?.date, false, "date")}
-        ${input("location", "Local", item?.location)}
-        ${select("companyId", "Empresa vinculada", state.data.companies, item?.companyId, "Opcional")}
-        ${textarea("description", "Descrição", item?.description, "full")}
+        <input type="hidden" name="date" value="${escapeAttr(item?.date || "")}">
+        <input type="hidden" name="location" value="${escapeAttr(item?.location || "")}">
+        <input type="hidden" name="companyId" value="${escapeAttr(item?.companyId || "")}">
+        <input type="hidden" name="description" value="${escapeAttr(item?.description || "")}">
         ${formActions()}
       </form>
     `,
