@@ -1591,6 +1591,7 @@ function eventCard(event) {
       <span class="event-proposal-count">
         <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
         <button class="event-model-link" type="button" data-event-model="${escapeAttr(event.id)}" data-event-name="${escapeAttr(event.name || "")}">T Modelo</button>
+        <button class="event-delete-link" type="button" data-delete-event="${escapeAttr(event.id)}" ${!canWrite() ? "disabled" : ""}>Excluir</button>
       </span>
     </article>
   `;
@@ -1603,12 +1604,14 @@ function openEventEditor(panel, config, item = null) {
         <span>${item ? "Editar evento" : "Novo evento"}</span>
         <h2>${escapeHtml(item?.name || "Cadastro de evento")}</h2>
       </div>
+      ${item && canWrite() ? `<button class="btn danger" type="button" data-delete-event="${escapeAttr(item.id)}">Excluir</button>` : ""}
     </div>
     ${config.form(item)}
   `;
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
   bindCrudForm(config, panel, item);
+  bindEventDeleteActions(panel);
 }
 
 function bindEventCards(scope, rows, config, panel) {
@@ -1623,6 +1626,29 @@ function bindEventCards(scope, rows, config, panel) {
       sessionStorage.setItem("openCrud:templates", "true");
       sessionStorage.setItem("templateDraftName", button.dataset.eventName || "");
       navigate("/modelos");
+    });
+  });
+  bindEventDeleteActions(scope);
+}
+
+function bindEventDeleteActions(scope) {
+  scope.querySelectorAll("[data-delete-event]").forEach(button => {
+    button.addEventListener("click", async event => {
+      event.stopPropagation();
+      const item = byId("events", button.dataset.deleteEvent);
+      if (!item) return;
+      const proposals = state.data.proposals.filter(proposal => proposal.eventId === item.id).length;
+      const message = proposals
+        ? `Excluir o evento externo "${item.name}"? ${proposals} proposta(s) vinculada(s) ficarao sem evento.`
+        : `Excluir o evento externo "${item.name}"?`;
+      if (!confirm(message)) return;
+      try {
+        await api(`/api/events/${item.id}`, { method: "DELETE" });
+        toast("Evento externo excluido.");
+        await reload();
+      } catch (error) {
+        toast(error.message);
+      }
     });
   });
 }
