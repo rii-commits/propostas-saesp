@@ -1550,14 +1550,14 @@ function renderEvents(main) {
   const scheduledEvents = rows.filter(event => event.date).length;
   main.innerHTML = `
     ${pageHeader("Eventos", "Galeria de cursos e atividades vinculados as propostas.", canWrite() ? `<button class="btn primary" id="newEventBtn">Novo evento</button>` : "")}
+    <section class="company-toolbar panel">
+      <label class="field"><span>Buscar evento</span><input id="eventGallerySearch" placeholder="Curso, empresa, local ou descricao"></label>
+      <div class="company-count" id="eventGalleryCount"></div>
+    </section>
     <section class="company-overview event-overview">
       <div><span>Eventos cadastrados</span><strong>${rows.length}</strong></div>
       <div><span>Com empresa vinculada</span><strong>${linkedEvents}</strong></div>
       <div><span>Com data definida</span><strong>${scheduledEvents}</strong></div>
-    </section>
-    <section class="company-toolbar panel">
-      <label class="field"><span>Buscar evento</span><input id="eventGallerySearch" placeholder="Curso, empresa, local ou descricao"></label>
-      <div class="company-count" id="eventGalleryCount"></div>
     </section>
     <section class="panel hidden company-editor event-editor" id="formPanel">${config.form()}</section>
     <section class="event-gallery" id="eventGallery">
