@@ -1584,14 +1584,15 @@ function eventCard(event) {
   ].join(" ").toLowerCase();
 
   return `
-    <button class="event-card" type="button" data-edit-event="${escapeAttr(event.id)}" data-search="${escapeAttr(searchText)}">
-      <span class="event-card-main">
+    <article class="event-card" data-event-card data-search="${escapeAttr(searchText)}">
+      <button class="event-card-main" type="button" data-edit-event="${escapeAttr(event.id)}">
         <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
-      </span>
+      </button>
       <span class="event-proposal-count">
         <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
+        <button class="event-model-link" type="button" data-event-model="${escapeAttr(event.id)}" data-event-name="${escapeAttr(event.name || "")}">T Modelo</button>
       </span>
-    </button>
+    </article>
   `;
 }
 
@@ -1617,12 +1618,19 @@ function bindEventCards(scope, rows, config, panel) {
       if (item) openEventEditor(panel, config, item);
     });
   });
+  scope.querySelectorAll("[data-event-model]").forEach(button => {
+    button.addEventListener("click", () => {
+      sessionStorage.setItem("openCrud:templates", "true");
+      sessionStorage.setItem("templateDraftName", button.dataset.eventName || "");
+      navigate("/modelos");
+    });
+  });
 }
 
 function bindEventGallerySearch(scope) {
   const input = scope.querySelector("#eventGallerySearch");
   const count = scope.querySelector("#eventGalleryCount");
-  const cards = Array.from(scope.querySelectorAll("[data-edit-event]"));
+  const cards = Array.from(scope.querySelectorAll("[data-event-card]"));
   const applySearch = () => {
     const query = (input?.value || "").toLowerCase().trim();
     let visible = 0;
@@ -1648,11 +1656,12 @@ function renderCrud(main, config) {
   `;
 
   const panel = main.querySelector("#formPanel");
-  main.querySelector("#newItemBtn")?.addEventListener("click", () => {
+  const openNewItemForm = () => {
     panel.innerHTML = config.form();
     panel.classList.remove("hidden");
     bindCrudForm(config, panel);
-  });
+  };
+  main.querySelector("#newItemBtn")?.addEventListener("click", openNewItemForm);
   main.querySelectorAll("[data-edit]").forEach(button => {
     button.addEventListener("click", () => {
       const item = rows.find(row => row.id === button.dataset.edit);
@@ -1676,6 +1685,19 @@ function renderCrud(main, config) {
   bindImportButtons(main);
   bindCounterpartImport(main);
   bindCounterpartFilters(main);
+
+  if (sessionStorage.getItem(`openCrud:${config.collection}`) === "true") {
+    sessionStorage.removeItem(`openCrud:${config.collection}`);
+    openNewItemForm();
+    if (config.collection === "templates") {
+      const draftName = sessionStorage.getItem("templateDraftName") || "";
+      sessionStorage.removeItem("templateDraftName");
+      const nameInput = panel.querySelector("[name='name']");
+      const typeInput = panel.querySelector("[name='type']");
+      if (nameInput && draftName) nameInput.value = `Modelo - ${draftName}`;
+      if (typeInput && !typeInput.value) typeInput.value = "Carta proposta";
+    }
+  }
 }
 
 function bindCrudForm(config, panel, item = null) {

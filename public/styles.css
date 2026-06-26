@@ -791,6 +791,10 @@ textarea:disabled {
   display: grid;
   align-content: start;
   gap: 8px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
 .event-card-main strong {
@@ -803,6 +807,8 @@ textarea:disabled {
 .event-proposal-count {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
@@ -819,6 +825,25 @@ textarea:disabled {
   font-size: 12px;
   font-style: normal;
   font-weight: 800;
+}
+
+.event-model-link {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.event-model-link:hover,
+.event-model-link:focus-visible {
+  background: var(--brand-dark);
+  outline: 0;
 }
 
 .event-editor {
