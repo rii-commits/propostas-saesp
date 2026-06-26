@@ -846,25 +846,6 @@ textarea:disabled {
   outline: 0;
 }
 
-.event-delete-link {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: #fff0ee;
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.event-delete-link:hover,
-.event-delete-link:focus-visible {
-  background: #ffe1dd;
-  outline: 0;
-}
-
 .event-editor {
   border-left-color: var(--brand);
 }

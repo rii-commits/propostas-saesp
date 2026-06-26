@@ -1591,7 +1591,6 @@ function eventCard(event) {
       <span class="event-proposal-count">
         <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
         <button class="event-model-link" type="button" data-event-model="${escapeAttr(event.id)}" data-event-name="${escapeAttr(event.name || "")}">T Modelo</button>
-        <button class="event-delete-link" type="button" data-delete-event="${escapeAttr(event.id)}" ${!canWrite() ? "disabled" : ""}>Excluir</button>
       </span>
     </article>
   `;
