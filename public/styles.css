@@ -1257,7 +1257,8 @@ tbody tr:nth-child(even) td {
   margin: 14px 0;
 }
 
-.planner-summary div {
+.planner-summary div,
+.planner-summary label {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
@@ -1273,6 +1274,27 @@ tbody tr:nth-child(even) td {
 .planner-summary strong {
   display: block;
   margin-top: 5px;
+}
+
+.planner-summary select {
+  width: 100%;
+  min-height: 30px;
+  margin-top: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  outline: 0;
+}
+
+.planner-summary select:not(:disabled) {
+  cursor: pointer;
+}
+
+.planner-summary select:focus-visible {
+  box-shadow: 0 0 0 3px rgba(120, 194, 200, 0.32);
 }
 
 .planner-note-form {

@@ -1030,8 +1030,18 @@ function openKanbanPlanner(proposalId) {
         <button class="btn" type="button" data-close-planner>Fechar</button>
       </div>
       <div class="planner-summary">
-        <div><span>Status</span><strong>${escapeHtml(proposal.status)}</strong></div>
-        <div><span>Etapa</span><strong>${escapeHtml(workflowLabels[proposal.workflowStage] || proposal.workflowStage)}</strong></div>
+        <label>
+          <span>Status</span>
+          <select data-planner-status ${!canWrite() ? "disabled" : ""}>
+            ${proposalStatuses.map(status => `<option value="${escapeAttr(status)}" ${proposal.status === status ? "selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Etapa</span>
+          <select data-planner-stage ${!canWrite() ? "disabled" : ""}>
+            ${workflowStages.map(stage => `<option value="${escapeAttr(stage)}" ${proposal.workflowStage === stage ? "selected" : ""}>${escapeHtml(workflowLabels[stage] || stage)}</option>`).join("")}
+          </select>
+        </label>
         <div><span>Valor</span><strong>${escapeHtml(money(proposal.value) || proposal.value || "Sem valor")}</strong></div>
         <div><span>Responsável</span><strong>${escapeHtml(proposal.ownerName)}</strong></div>
       </div>
@@ -1068,6 +1078,37 @@ function openKanbanPlanner(proposalId) {
     if (event.target === overlay) close();
   });
   overlay.querySelector("[data-close-planner]").addEventListener("click", close);
+  const savePlannerStatus = async changes => {
+    const current = byId("proposals", proposalId);
+    if (!current) return;
+    try {
+      await api(`/api/proposals/${proposalId}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...current, ...changes })
+      });
+      toast("Proposta atualizada.");
+      close();
+      await reload();
+      navigate("/kanban", true);
+      openKanbanPlanner(proposalId);
+    } catch (error) {
+      toast(error.message);
+      close();
+      openKanbanPlanner(proposalId);
+    }
+  };
+  overlay.querySelector("[data-planner-status]")?.addEventListener("change", event => {
+    savePlannerStatus({ status: event.currentTarget.value });
+  });
+  overlay.querySelector("[data-planner-stage]")?.addEventListener("change", event => {
+    const nextStage = event.currentTarget.value;
+    const nextStatus = nextStage === "Declinios"
+      ? "Recusada"
+      : proposal.workflowStage === "Declinios" && proposal.status === "Recusada"
+        ? "Rascunho"
+        : proposal.status;
+    savePlannerStatus({ workflowStage: nextStage, status: nextStatus });
+  });
   overlay.querySelector(".planner-note-form").addEventListener("submit", async event => {
     event.preventDefault();
     const content = new FormData(event.currentTarget).get("content");
