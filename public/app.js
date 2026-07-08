@@ -1601,12 +1601,14 @@ function openCompanyEditor(panel, config, item = null) {
         <span>${item ? "Editar empresa" : "Nova empresa"}</span>
         <h2>${escapeHtml(item?.name || "Cadastro de empresa")}</h2>
       </div>
+      ${item && canWrite() ? `<button class="btn danger" type="button" data-delete-company="${escapeAttr(item.id)}">Excluir</button>` : ""}
     </div>
     ${config.form(item)}
   `;
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
   bindCrudForm(config, panel, item);
+  bindCompanyDeleteActions(panel);
 }
 
 function bindCompanyCards(scope, rows, config, panel) {
@@ -1614,6 +1616,33 @@ function bindCompanyCards(scope, rows, config, panel) {
     card.addEventListener("click", () => {
       const item = rows.find(row => row.id === card.dataset.editCompany);
       if (item) openCompanyEditor(panel, config, item);
+    });
+  });
+}
+
+function bindCompanyDeleteActions(scope) {
+  scope.querySelectorAll("[data-delete-company]").forEach(button => {
+    button.addEventListener("click", async event => {
+      event.stopPropagation();
+      const item = byId("companies", button.dataset.deleteCompany);
+      if (!item) return;
+      const proposals = state.data.proposals.filter(proposal => proposal.companyId === item.id).length;
+      const events = state.data.events.filter(row => row.companyId === item.id).length;
+      const linked = [
+        proposals ? `${proposals} proposta(s)` : "",
+        events ? `${events} evento(s)` : ""
+      ].filter(Boolean).join(" e ");
+      const message = linked
+        ? `Excluir a empresa "${item.name}"? ${linked} vinculados ficarao sem empresa.`
+        : `Excluir a empresa "${item.name}"?`;
+      if (!confirm(message)) return;
+      try {
+        await api(`/api/companies/${item.id}`, { method: "DELETE" });
+        toast("Empresa excluida.");
+        await reload();
+      } catch (error) {
+        toast(error.message);
+      }
     });
   });
 }
