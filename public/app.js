@@ -1873,32 +1873,15 @@ function bindIntegratedEventForm(config, panel, item = null) {
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const data = new FormData(form);
-    const newCompanyName = String(data.get("newCompanyName") || "").trim();
-    let companyId = data.get("companyId") || "";
 
     try {
-      if (newCompanyName) {
-        const company = await api("/api/companies", {
-          method: "POST",
-          body: JSON.stringify({
-            name: newCompanyName,
-            cnpj: "",
-            address: data.get("newCompanyAddress"),
-            contactPerson: data.get("newCompanyContactPerson"),
-            contacts: data.get("newCompanyContacts"),
-            notes: `Criada no cadastro do evento: ${data.get("name") || ""}`
-          })
-        });
-        companyId = company.id;
-      }
-
       const savedEvent = await api(`/api/events${item ? `/${item.id}` : ""}`, {
         method: item ? "PUT" : "POST",
         body: JSON.stringify({
           name: data.get("name"),
           date: data.get("date"),
           location: data.get("location"),
-          companyId,
+          companyId: item?.companyId || "",
           description: data.get("description")
         })
       });
@@ -1919,7 +1902,7 @@ function bindIntegratedEventForm(config, panel, item = null) {
         });
       }
 
-      toast(item ? "Evento salvo." : "Evento, empresa e modelo integrados salvos.");
+      toast(item ? "Evento salvo." : "Evento e modelo da carta salvos.");
       await reload();
     } catch (error) {
       toast(error.message);
@@ -1964,16 +1947,6 @@ function eventConfig() {
             ${input("date", "Data do evento", item?.date, false, "date")}
             ${input("location", "Local", item?.location)}
             ${textarea("description", "Descrição", item?.description, "full")}
-          </div>
-        </div>
-        <div class="integrated-form-section full">
-          <div class="integrated-section-title"><strong>Empresa do evento</strong><span>Selecione uma empresa existente ou cadastre uma nova agora</span></div>
-          <div class="integrated-section-grid">
-            ${select("companyId", "Empresa já cadastrada", state.data.companies, item?.companyId, "Sem empresa vinculada")}
-            ${input("newCompanyName", "Nova empresa", "")}
-            ${input("newCompanyContactPerson", "Responsável", "")}
-            ${textarea("newCompanyContacts", "Contato", "", "full")}
-            ${input("newCompanyAddress", "Endereço", "")}
           </div>
         </div>
         ${!item ? `
