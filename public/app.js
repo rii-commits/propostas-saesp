@@ -1715,20 +1715,32 @@ function eventGallery(rows) {
 
 function eventCard(event) {
   const proposals = state.data.proposals.filter(proposal => proposal.eventId === event.id);
+  const currentYear = String(new Date().getFullYear());
+  const citiesThisYear = Array.from(new Set(proposals
+    .filter(proposal => String(proposal.controlYear || proposal.issuedAt || proposal.createdAt || "").includes(currentYear))
+    .map(proposal => byId("events", proposal.eventId)?.location || proposal.location || "")
+    .map(value => String(value || "").trim())
+    .filter(Boolean)));
+  const regionLabel = citiesThisYear.length
+    ? `${citiesThisYear.length} ${citiesThisYear.length === 1 ? "cidade este ano" : "cidades este ano"}`
+    : "Múltiplas Regiões";
+  const volumeLabel = proposals.length
+    ? `${proposals.length} ${proposals.length === 1 ? "proposta ativa" : "propostas ativas"}`
+    : "Sem propostas ativas";
   const searchText = [
     event.name,
-    event.description
+    event.description,
+    regionLabel,
+    volumeLabel
   ].join(" ").toLowerCase();
 
   return `
     <article class="event-card" data-event-card data-search="${escapeAttr(searchText)}">
       <button class="event-card-main" type="button" data-edit-event="${escapeAttr(event.id)}">
         <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
+        <span class="event-card-meta">${routeIcon("map-pin")}${escapeHtml(regionLabel)}</span>
+        <span class="event-card-meta">${routeIcon("calendar-days")}${escapeHtml(volumeLabel)}</span>
       </button>
-      <span class="event-proposal-count">
-        <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
-        <button class="event-model-link" type="button" data-event-model="${escapeAttr(event.id)}" data-event-name="${escapeAttr(event.name || "")}">T Modelo</button>
-      </span>
     </article>
   `;
 }
@@ -1755,13 +1767,6 @@ function bindEventCards(scope, rows, config, panel) {
     card.addEventListener("click", () => {
       const item = rows.find(row => row.id === card.dataset.editEvent);
       if (item) openEventEditor(panel, config, item);
-    });
-  });
-  scope.querySelectorAll("[data-event-model]").forEach(button => {
-    button.addEventListener("click", () => {
-      sessionStorage.setItem("openCrud:templates", "true");
-      sessionStorage.setItem("templateDraftName", button.dataset.eventName || "");
-      navigate("/modelos");
     });
   });
   bindEventDeleteActions(scope);

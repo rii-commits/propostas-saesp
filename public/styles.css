@@ -1204,19 +1204,17 @@ textarea:disabled {
 
 .event-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .event-card {
-  min-height: 138px;
+  min-height: 154px;
   display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 14px;
   width: 100%;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fff;
   color: var(--ink);
   text-align: left;
@@ -1226,8 +1224,8 @@ textarea:disabled {
 
 .event-card:hover,
 .event-card:focus-visible {
-  border-color: var(--aqua);
-  box-shadow: 0 14px 34px rgba(20, 66, 125, 0.13);
+  border-color: rgba(20, 66, 125, 0.24);
+  box-shadow: 0 12px 28px rgba(20, 66, 125, 0.1);
   outline: 0;
   transform: translateY(-2px);
 }
@@ -1235,7 +1233,8 @@ textarea:disabled {
 .event-card-main {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   padding: 0;
   background: transparent;
   color: inherit;
@@ -1243,52 +1242,27 @@ textarea:disabled {
 }
 
 .event-card-main strong {
-  color: var(--aqua);
-  font-size: 20px;
-  font-weight: 850;
-  line-height: 1.18;
-}
-
-.event-proposal-count {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-
-.event-proposal-count i {
-  min-height: 24px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 8px;
-  background: rgba(120, 194, 200, 0.2);
   color: var(--brand);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.22;
 }
 
-.event-model-link {
-  min-height: 28px;
-  display: inline-flex;
+.event-card-meta {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
+  gap: 8px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
-.event-model-link:hover,
-.event-model-link:focus-visible {
-  background: var(--brand-dark);
-  outline: 0;
+.event-card-meta .lucide-icon {
+  width: 16px;
+  height: 16px;
+  color: #98a2b3;
+  stroke-width: 2;
 }
 
 .event-editor {
