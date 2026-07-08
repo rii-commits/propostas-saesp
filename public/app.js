@@ -417,6 +417,7 @@ function renderApp() {
   else if (active === "/historico") renderHistory(main);
   else if (active === "/usuarios" && canAdmin()) renderCrud(main, userConfig());
   else renderDashboard(main);
+  enhanceSearchableSelects(main);
 }
 
 function userInitials(name) {
@@ -1836,6 +1837,7 @@ function bindCrudForm(config, panel, item = null) {
   const form = panel.querySelector("form");
   bindVariableButtons(panel);
   bindImportButtons(panel);
+  enhanceSearchableSelects(panel);
   if (config.collection === "events") {
     bindIntegratedEventForm(config, panel, item);
     return;
@@ -2521,7 +2523,48 @@ function textarea(name, label, value = "", extraClass = "", required = false) {
 }
 
 function select(name, label, rows, value = "", placeholder = "Selecione", required = false) {
-  return `<label class="field"><span>${label}</span><select name="${name}" ${required ? "required" : ""} ${!canWrite() ? "disabled" : ""}><option value="">${placeholder}</option>${options(rows, value)}</select></label>`;
+  return `<label class="field"><span>${label}</span><select name="${name}" data-searchable-select="true" data-placeholder="${escapeAttr(placeholder)}" ${required ? "required" : ""} ${!canWrite() ? "disabled" : ""}><option value="">${placeholder}</option>${options(rows, value)}</select></label>`;
+}
+
+function enhanceSearchableSelects(scope = document) {
+  scope.querySelectorAll("select[data-searchable-select='true']").forEach(selectNode => {
+    if (selectNode.dataset.searchEnhanced === "true") return;
+    selectNode.dataset.searchEnhanced = "true";
+    const listId = `searchable-${selectNode.name || "select"}-${Math.random().toString(36).slice(2)}`;
+    const inputNode = document.createElement("input");
+    const listNode = document.createElement("datalist");
+    inputNode.type = "search";
+    inputNode.className = "searchable-select-input";
+    inputNode.setAttribute("list", listId);
+    inputNode.placeholder = selectNode.dataset.placeholder || "Digite para pesquisar";
+    inputNode.disabled = selectNode.disabled;
+    listNode.id = listId;
+
+    const syncOptions = () => {
+      listNode.innerHTML = Array.from(selectNode.options)
+        .filter(option => option.value)
+        .map(option => `<option value="${escapeAttr(option.textContent || "")}"></option>`)
+        .join("");
+    };
+    const syncInput = () => {
+      inputNode.value = selectNode.selectedOptions[0]?.value ? (selectNode.selectedOptions[0]?.textContent || "") : "";
+    };
+    const applyInput = () => {
+      const query = inputNode.value.trim().toLowerCase();
+      const exact = Array.from(selectNode.options).find(option => option.value && (option.textContent || "").trim().toLowerCase() === query);
+      selectNode.value = exact ? exact.value : "";
+      selectNode.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    syncOptions();
+    syncInput();
+    inputNode.addEventListener("change", applyInput);
+    inputNode.addEventListener("blur", applyInput);
+    selectNode.addEventListener("change", syncInput);
+    selectNode.classList.add("native-searchable-select");
+    selectNode.insertAdjacentElement("afterend", inputNode);
+    inputNode.insertAdjacentElement("afterend", listNode);
+  });
 }
 
 function options(rows, selected = "") {
