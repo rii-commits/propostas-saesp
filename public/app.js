@@ -441,7 +441,11 @@ function routeIcon(key) {
     "/propostas": `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>`,
     "/controle": `<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>`,
     "/historico": `<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/>`,
-    "/usuarios": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>`
+    "/usuarios": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>`,
+    "user": `<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>`,
+    "phone": `<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.4 2.1L8 9.6a16 16 0 0 0 6.4 6.4l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2z"/>`,
+    "map-pin": `<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/>`,
+    "search": `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`
   };
   return `<svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[key] || icons["/dashboard"]}</svg>`;
 }
@@ -1512,18 +1516,21 @@ async function downloadDocx(id) {
 function renderCompanies(main) {
   const config = companyConfig();
   const rows = [...state.data.companies].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
-  const companiesWithContact = rows.filter(company => company.contactPerson || company.contacts).length;
+  const companiesWithContact = rows.filter(company => company.contacts).length;
   const linkedProposals = new Set(state.data.proposals.map(proposal => proposal.companyId).filter(Boolean)).size;
   main.innerHTML = `
-    ${pageHeader("Empresas", "Galeria de contas comerciais, contatos e historico de propostas.", canWrite() ? `<button class="btn primary" id="newCompanyBtn">Nova empresa</button>` : "")}
+    ${pageHeader("Empresas", "Galeria de contas comerciais, contatos e historico de propostas.")}
     <section class="company-overview">
-      <div><span>Empresas cadastradas</span><strong>${rows.length}</strong></div>
-      <div><span>Com contato</span><strong>${companiesWithContact}</strong></div>
-      <div><span>Com propostas</span><strong>${linkedProposals}</strong></div>
+      <button class="company-filter-card active" type="button" data-company-filter="all"><span>Empresas cadastradas</span><strong>${rows.length}</strong></button>
+      <button class="company-filter-card" type="button" data-company-filter="contact"><span>Com contato</span><strong>${companiesWithContact}</strong></button>
+      <button class="company-filter-card" type="button" data-company-filter="proposals"><span>Com propostas</span><strong>${linkedProposals}</strong></button>
     </section>
     <section class="company-toolbar panel">
-      <label class="field"><span>Buscar empresa</span><input id="companyGallerySearch" placeholder="Nome, responsavel, contato, endereco ou observacao"></label>
-      <div class="company-count" id="companyGalleryCount"></div>
+      <label class="field company-search"><span>Buscar empresa</span><i>${routeIcon("search")}</i><input id="companyGallerySearch" placeholder="Nome, responsavel, contato, endereco ou observacao"></label>
+      <div class="company-toolbar-actions">
+        <span class="company-count" id="companyGalleryCount"></span>
+        ${canWrite() ? `<button class="btn primary company-add-btn" id="newCompanyBtn" type="button">Adicionar empresa</button>` : ""}
+      </div>
     </section>
     <section class="panel hidden company-editor" id="formPanel">${config.form()}</section>
     <section class="company-gallery" id="companyGallery">
@@ -1547,6 +1554,10 @@ function companyGallery(rows) {
 function companyCard(company) {
   const proposals = state.data.proposals.filter(proposal => proposal.companyId === company.id);
   const events = state.data.events.filter(event => event.companyId === company.id);
+  const hasResponsible = Boolean(String(company.contactPerson || "").trim());
+  const hasContact = Boolean(String(company.contacts || "").trim());
+  const hasProposals = proposals.length > 0;
+  const hasEvents = events.length > 0;
   const initials = String(company.name || "?")
     .split(/\s+/)
     .filter(Boolean)
@@ -1564,19 +1575,19 @@ function companyCard(company) {
   ].join(" ").toLowerCase();
 
   return `
-    <button class="company-card" type="button" data-edit-company="${escapeAttr(company.id)}" data-search="${escapeAttr(searchText)}">
+    <button class="company-card" type="button" data-edit-company="${escapeAttr(company.id)}" data-search="${escapeAttr(searchText)}" data-has-contact="${hasContact ? "true" : "false"}" data-has-proposals="${hasProposals ? "true" : "false"}">
       <span class="company-avatar">${escapeHtml(initials || "?")}</span>
       <span class="company-card-main">
         <strong>${escapeHtml(company.name || "Sem nome")}</strong>
-        <small>${escapeHtml(company.contactPerson || "Responsavel nao informado")}</small>
       </span>
       <span class="company-card-details">
-        <span>${escapeHtml(company.contacts || "Sem contato registrado")}</span>
-        <span>${escapeHtml(company.address || "Endereco nao informado")}</span>
+        <span class="company-info-row">${routeIcon("user")}${hasResponsible ? escapeHtml(company.contactPerson) : `<b class="company-alert-badge">⚠ Sem Responsável</b>`}</span>
+        <span class="company-info-row">${routeIcon("phone")}${hasContact ? escapeHtml(company.contacts) : `<b class="company-alert-badge">⚠ Sem Contato</b>`}</span>
+        <span class="company-info-row">${routeIcon("map-pin")}${escapeHtml(company.address || "Endereço não informado")}</span>
       </span>
       <span class="company-card-footer">
-        <i>${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
-        <i>${events.length} ${events.length === 1 ? "evento" : "eventos"}</i>
+        <i class="${hasProposals ? "active" : "muted"}">${proposals.length} ${proposals.length === 1 ? "proposta" : "propostas"}</i>
+        <i class="${hasEvents ? "active" : "muted"}">${events.length} ${events.length === 1 ? "evento" : "eventos"}</i>
       </span>
     </button>
   `;
@@ -1610,16 +1621,31 @@ function bindCompanyGallerySearch(scope) {
   const input = scope.querySelector("#companyGallerySearch");
   const count = scope.querySelector("#companyGalleryCount");
   const cards = Array.from(scope.querySelectorAll("[data-edit-company]"));
+  const filters = Array.from(scope.querySelectorAll("[data-company-filter]"));
+  let activeFilter = "all";
   const applySearch = () => {
     const query = (input?.value || "").toLowerCase().trim();
     let visible = 0;
     cards.forEach(card => {
-      const matches = !query || card.dataset.search.includes(query);
+      const matchesQuery = !query || card.dataset.search.includes(query);
+      const matchesFilter = activeFilter === "contact"
+        ? card.dataset.hasContact === "true"
+        : activeFilter === "proposals"
+          ? card.dataset.hasProposals === "true"
+          : true;
+      const matches = matchesQuery && matchesFilter;
       card.classList.toggle("hidden", !matches);
       if (matches) visible += 1;
     });
     if (count) count.textContent = `${visible} ${visible === 1 ? "empresa" : "empresas"}`;
   };
+  filters.forEach(filter => {
+    filter.addEventListener("click", () => {
+      activeFilter = filter.dataset.companyFilter || "all";
+      filters.forEach(item => item.classList.toggle("active", item === filter));
+      applySearch();
+    });
+  });
   input?.addEventListener("input", applySearch);
   applySearch();
 }
