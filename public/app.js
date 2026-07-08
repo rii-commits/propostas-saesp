@@ -2171,6 +2171,28 @@ function renderProposalForm(main, id = null) {
         <label class="field"><span>Status</span><select name="status">${proposalStatuses.map(status => `<option ${item?.status === status || (!item && status === "Rascunho") ? "selected" : ""}>${status}</option>`).join("")}</select></label>
         <label class="field"><span>Etapa operacional</span><select name="workflowStage" ${!canWrite() ? "disabled" : ""}>${workflowStages.map(stage => `<option value="${stage}" ${(item?.workflowStage || "Em confeccao") === stage ? "selected" : ""}>${workflowLabels[stage]}</option>`).join("")}</select></label>
       </div>
+      ${!item && canWrite() ? `
+        <section class="quick-company-box" id="quickCompanyBox">
+          <button class="quick-company-toggle" type="button" id="quickCompanyToggle">
+            <span>Empresa não cadastrada?</span>
+            <strong>Cadastrar empresa agora</strong>
+          </button>
+          <div class="quick-company-form hidden" id="quickCompanyForm">
+            <div class="integrated-section-title"><strong>Cadastro rápido de empresa</strong><span>A empresa será criada e selecionada nesta proposta.</span></div>
+            <div class="integrated-section-grid">
+              ${input("quickCompanyName", "Nome da empresa", "")}
+              ${input("quickCompanyCnpj", "CNPJ", "")}
+              ${input("quickCompanyContactPerson", "Responsável", "")}
+              ${input("quickCompanyAddress", "Endereço", "")}
+              ${textarea("quickCompanyContacts", "Contatos", "", "full")}
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" id="quickCompanyCancel">Cancelar</button>
+              <button class="btn primary" type="button" id="quickCompanySave">Salvar e selecionar empresa</button>
+            </div>
+          </div>
+        </section>
+      ` : ""}
       <div class="field full" style="margin-top:16px">
         <label>Contrapartidas</label>
         <div class="counterpart-tools">
@@ -2205,6 +2227,7 @@ function renderProposalForm(main, id = null) {
 
   main.querySelector("#backBtn").addEventListener("click", () => navigate("/propostas"));
   main.querySelector("#downloadBtn")?.addEventListener("click", () => downloadDocx(item.id));
+  bindQuickCompanyCreation(main);
   main.querySelector("[name='companyId']")?.addEventListener("change", event => {
     const company = byId("companies", event.currentTarget.value);
     const recipientInput = main.querySelector("[name='recipientName']");
@@ -2250,6 +2273,60 @@ function renderProposalForm(main, id = null) {
       toast("Proposta salva.");
       await reload();
       navigate(`/propostas/${saved.id}/editar`, true);
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+}
+
+function bindQuickCompanyCreation(scope) {
+  const box = scope.querySelector("#quickCompanyBox");
+  if (!box) return;
+  const form = scope.querySelector("#quickCompanyForm");
+  scope.querySelector("#quickCompanyToggle")?.addEventListener("click", () => {
+    form?.classList.toggle("hidden");
+    form?.querySelector("[name='quickCompanyName']")?.focus();
+  });
+  scope.querySelector("#quickCompanyCancel")?.addEventListener("click", () => {
+    form?.classList.add("hidden");
+  });
+  scope.querySelector("#quickCompanySave")?.addEventListener("click", async () => {
+    const name = scope.querySelector("[name='quickCompanyName']")?.value.trim() || "";
+    if (!name) {
+      toast("Informe o nome da empresa.");
+      return;
+    }
+
+    const payload = {
+      name,
+      cnpj: scope.querySelector("[name='quickCompanyCnpj']")?.value || "",
+      address: scope.querySelector("[name='quickCompanyAddress']")?.value || "",
+      contactPerson: scope.querySelector("[name='quickCompanyContactPerson']")?.value || "",
+      contacts: scope.querySelector("[name='quickCompanyContacts']")?.value || "",
+      notes: "Criada no cadastro de nova proposta."
+    };
+
+    try {
+      const company = await api("/api/companies", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      state.data.companies.push(company);
+
+      const companySelect = scope.querySelector("[name='companyId']");
+      const option = document.createElement("option");
+      option.value = company.id;
+      option.textContent = company.name;
+      companySelect?.appendChild(option);
+      if (companySelect) {
+        companySelect.value = company.id;
+        companySelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      const recipientInput = scope.querySelector("[name='recipientName']");
+      if (recipientInput && company.contactPerson) recipientInput.value = company.contactPerson;
+      form?.classList.add("hidden");
+      toast("Empresa criada e selecionada.");
     } catch (error) {
       toast(error.message);
     }
