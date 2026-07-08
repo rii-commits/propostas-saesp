@@ -995,6 +995,51 @@ textarea:disabled {
   border-left: 4px solid var(--aqua);
 }
 
+.integrated-event-form {
+  gap: 16px;
+}
+
+.integrated-form-section {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.integrated-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.integrated-section-title strong {
+  color: var(--brand-dark);
+  font-size: 15px;
+}
+
+.integrated-section-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.integrated-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.integrated-toggle {
+  margin: 0;
+  min-height: 64px;
+  background: #fff7f2;
+  border-color: #fed7aa;
+}
+
 .company-editor-header {
   display: flex;
   align-items: flex-start;
@@ -1831,7 +1876,8 @@ tbody tr:nth-child(even) td {
   }
 
   .company-toolbar,
-  .company-card {
+  .company-card,
+  .integrated-section-grid {
     grid-template-columns: 1fr;
   }
 

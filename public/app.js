@@ -1836,6 +1836,10 @@ function bindCrudForm(config, panel, item = null) {
   const form = panel.querySelector("form");
   bindVariableButtons(panel);
   bindImportButtons(panel);
+  if (config.collection === "events") {
+    bindIntegratedEventForm(config, panel, item);
+    return;
+  }
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const payload = config.serialize(new FormData(form), form);
@@ -1845,6 +1849,75 @@ function bindCrudForm(config, panel, item = null) {
         body: JSON.stringify(payload)
       });
       toast("Registro salvo.");
+      await reload();
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  panel.querySelector("[data-cancel]")?.addEventListener("click", () => panel.classList.add("hidden"));
+}
+
+function bindIntegratedEventForm(config, panel, item = null) {
+  const form = panel.querySelector("form");
+  const eventNameInput = form.querySelector("[name='name']");
+  const templateNameInput = form.querySelector("[name='templateName']");
+  eventNameInput?.addEventListener("input", () => {
+    if (!templateNameInput) return;
+    const current = String(templateNameInput.value || "");
+    if (!current || current === "Modelo - " || current.startsWith("Modelo - ")) {
+      templateNameInput.value = `Modelo - ${eventNameInput.value}`;
+    }
+  });
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const newCompanyName = String(data.get("newCompanyName") || "").trim();
+    let companyId = data.get("companyId") || "";
+
+    try {
+      if (newCompanyName) {
+        const company = await api("/api/companies", {
+          method: "POST",
+          body: JSON.stringify({
+            name: newCompanyName,
+            cnpj: "",
+            address: data.get("newCompanyAddress"),
+            contactPerson: data.get("newCompanyContactPerson"),
+            contacts: data.get("newCompanyContacts"),
+            notes: `Criada no cadastro do evento: ${data.get("name") || ""}`
+          })
+        });
+        companyId = company.id;
+      }
+
+      const savedEvent = await api(`/api/events${item ? `/${item.id}` : ""}`, {
+        method: item ? "PUT" : "POST",
+        body: JSON.stringify({
+          name: data.get("name"),
+          date: data.get("date"),
+          location: data.get("location"),
+          companyId,
+          description: data.get("description")
+        })
+      });
+
+      if (!item && data.get("createTemplate") === "on") {
+        const content = data.get("templateContent") || defaultProposalTemplateContent();
+        await api("/api/templates", {
+          method: "POST",
+          body: JSON.stringify({
+            name: data.get("templateName") || `Modelo - ${savedEvent.name}`,
+            type: data.get("templateType") || "Carta proposta",
+            content,
+            variables: variables.filter(key => String(content).includes(`{{${key}}}`)),
+            importedFileName: data.get("importedFileName"),
+            importedFilePath: data.get("importedFilePath"),
+            storagePath: data.get("storagePath")
+          })
+        });
+      }
+
+      toast(item ? "Evento salvo." : "Evento, empresa e modelo integrados salvos.");
       await reload();
     } catch (error) {
       toast(error.message);
@@ -1875,17 +1948,57 @@ function companyConfig() {
 }
 
 function eventConfig() {
+  const templateContent = defaultProposalTemplateContent();
   return {
     title: "Eventos externos",
     subtitle: "Cursos e atividades externas usados nas propostas.",
     collection: "events",
     form: item => `
-      <form class="form-grid">
-        ${input("name", "Nome", item?.name, true)}
-        <input type="hidden" name="date" value="${escapeAttr(item?.date || "")}">
-        <input type="hidden" name="location" value="${escapeAttr(item?.location || "")}">
-        <input type="hidden" name="companyId" value="${escapeAttr(item?.companyId || "")}">
-        <input type="hidden" name="description" value="${escapeAttr(item?.description || "")}">
+      <form class="form-grid integrated-event-form">
+        <div class="integrated-form-section full">
+          <div class="integrated-section-title"><strong>Evento</strong><span>Dados principais usados nas propostas</span></div>
+          <div class="integrated-section-grid">
+            ${input("name", "Nome do evento", item?.name, true)}
+            ${input("date", "Data do evento", item?.date, false, "date")}
+            ${input("location", "Local", item?.location)}
+            ${textarea("description", "Descrição", item?.description, "full")}
+          </div>
+        </div>
+        <div class="integrated-form-section full">
+          <div class="integrated-section-title"><strong>Empresa do evento</strong><span>Selecione uma empresa existente ou cadastre uma nova agora</span></div>
+          <div class="integrated-section-grid">
+            ${select("companyId", "Empresa já cadastrada", state.data.companies, item?.companyId, "Sem empresa vinculada")}
+            ${input("newCompanyName", "Nova empresa", "")}
+            ${input("newCompanyContactPerson", "Responsável", "")}
+            ${textarea("newCompanyContacts", "Contato", "", "full")}
+            ${input("newCompanyAddress", "Endereço", "")}
+          </div>
+        </div>
+        ${!item ? `
+          <div class="integrated-form-section full">
+            <label class="check-card integrated-toggle selected">
+              <input type="checkbox" name="createTemplate" checked>
+              <span><strong>Cadastrar modelo da carta proposta junto com este evento</strong><span class="muted">O modelo será criado automaticamente em Modelos após salvar o evento.</span></span>
+            </label>
+            <div class="integrated-section-title"><strong>Modelo da carta proposta</strong><span>Base inicial da carta vinculada comercialmente a este evento</span></div>
+            <div class="integrated-section-grid">
+              ${input("templateName", "Nome do modelo", `Modelo - ${item?.name || ""}`)}
+              ${input("templateType", "Tipo", "Carta proposta")}
+              <div class="field full">
+                <label>Importar Word</label>
+                <input type="file" id="docxImport" accept=".docx">
+                <input type="hidden" name="importedFileName" value="">
+                <input type="hidden" name="importedFilePath" value="">
+                <input type="hidden" name="storagePath" value="">
+              </div>
+              <div class="field full">
+                <label>Variáveis</label>
+                <div class="variables">${variables.map(key => `<button type="button" data-insert-var="{{${key}}}">{{${key}}}</button>`).join("")}</div>
+              </div>
+              ${textarea("templateContent", "Conteúdo", templateContent, "full editor")}
+            </div>
+          </div>
+        ` : ""}
         ${formActions()}
       </form>
     `,
@@ -2128,6 +2241,12 @@ function renderProposalForm(main, id = null) {
   main.querySelector("#counterpartEvent")?.addEventListener("input", () => renderCounterpartPicker(main, selectedCounterparts));
   main.querySelector("[name='eventId']")?.addEventListener("change", event => {
     const counterpartEvent = main.querySelector("#counterpartEvent");
+    const selectedEvent = byId("events", event.currentTarget.value);
+    const templateSelect = main.querySelector("[name='templateId']");
+    const linkedTemplate = selectedEvent
+      ? state.data.templates.find(template => String(template.name || "").toLowerCase() === `modelo - ${String(selectedEvent.name || "").toLowerCase()}`)
+      : null;
+    if (templateSelect && linkedTemplate && !templateSelect.value) templateSelect.value = linkedTemplate.id;
     if (counterpartEvent && event.currentTarget.value) {
       counterpartEvent.value = event.currentTarget.value;
       renderCounterpartPicker(main, selectedCounterparts);
@@ -2258,7 +2377,8 @@ function localFillTemplate(payload) {
 function bindVariableButtons(scope) {
   scope.querySelectorAll("[data-insert-var]").forEach(button => {
     button.addEventListener("click", () => {
-      const textarea = scope.querySelector("textarea[name='content']");
+      const textarea = scope.querySelector("textarea[name='content'], textarea[name='templateContent']");
+      if (!textarea) return;
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       textarea.value = `${textarea.value.slice(0, start)}${button.dataset.insertVar}${textarea.value.slice(end)}`;
@@ -2266,6 +2386,26 @@ function bindVariableButtons(scope) {
       textarea.selectionStart = textarea.selectionEnd = start + button.dataset.insertVar.length;
     });
   });
+}
+
+function defaultProposalTemplateContent() {
+  return [
+    "À {{empresa}}",
+    "",
+    "Prezados,",
+    "",
+    "Apresentamos a proposta comercial para o evento {{evento}}, previsto para {{data_evento}} em {{local}}.",
+    "",
+    "Responsável pelo contato: {{responsavel}}.",
+    "Responsável interno: {{responsavel_interno}}.",
+    "",
+    "Valor da proposta: {{valor}}.",
+    "",
+    "Contrapartidas previstas:",
+    "{{contrapartidas}}",
+    "",
+    "Atenciosamente,"
+  ].join("\n");
 }
 
 function bindImportButtons(scope) {
