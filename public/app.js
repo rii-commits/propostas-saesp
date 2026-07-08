@@ -2156,8 +2156,8 @@ function renderProposalForm(main, id = null) {
     : (years.includes(String(new Date().getFullYear())) ? String(new Date().getFullYear()) : (years[0] || ""));
   const history = state.data.proposalVersions.filter(version => version.proposalId === id);
   main.innerHTML = `
-    ${pageHeader(item ? "Editar proposta" : "Nova proposta", "Monte a carta a partir de modelo, empresa, evento e contrapartidas.", `<button class="btn" id="backBtn">Voltar</button>`)}
-    <form class="panel" id="proposalForm">
+    ${pageHeader(item ? "Editar proposta" : "Nova proposta", "Monte a carta a partir de modelo, empresa, evento e contrapartidas.")}
+    <form class="panel proposal-card" id="proposalForm">
       <input type="hidden" name="id" value="${escapeAttr(item?.id || "")}">
       <div class="form-grid three">
         <label class="field"><span>Código de controle</span><input name="controlCode" value="${escapeAttr(item?.controlCode || "")}" placeholder="Ex.: C 070/2026" inputmode="numeric" autocomplete="off" required ${!canWrite() ? "disabled" : ""}></label>
@@ -2209,7 +2209,8 @@ function renderProposalForm(main, id = null) {
       </div>
       <div class="actions" style="margin-top:14px">
         <button class="btn warn" type="button" id="regenerateBtn" ${!canWrite() ? "disabled" : ""}>Preencher pelo modelo</button>
-        <button class="btn primary" type="submit" ${!canWrite() ? "disabled" : ""}>Salvar</button>
+        <button class="btn proposal-cancel-btn" type="button" id="bottomBackBtn">Voltar</button>
+        <button class="btn primary proposal-save-btn" type="submit" ${!canWrite() ? "disabled" : ""}>Salvar Proposta</button>
         ${item ? `<button class="btn" type="button" id="downloadBtn" ${!canWrite() ? "disabled" : ""}>Baixar Word</button>` : ""}
       </div>
     </form>
@@ -2225,7 +2226,8 @@ function renderProposalForm(main, id = null) {
     ` : ""}
   `;
 
-  main.querySelector("#backBtn").addEventListener("click", () => navigate("/propostas"));
+  main.querySelector("#backBtn")?.addEventListener("click", () => navigate("/propostas"));
+  main.querySelector("#bottomBackBtn")?.addEventListener("click", () => navigate("/propostas"));
   main.querySelector("#downloadBtn")?.addEventListener("click", () => downloadDocx(item.id));
   bindQuickCompanyCreation(main);
   main.querySelector("[name='companyId']")?.addEventListener("change", event => {
@@ -2283,7 +2285,25 @@ function bindQuickCompanyCreation(scope) {
   const box = scope.querySelector("#quickCompanyBox");
   if (!box) return;
   const form = scope.querySelector("#quickCompanyForm");
-  scope.querySelector("#quickCompanyToggle")?.addEventListener("click", () => {
+  const companyField = scope.querySelector("[name='companyId']")?.closest(".field");
+  const label = companyField?.querySelector("span");
+  const originalToggle = scope.querySelector("#quickCompanyToggle");
+  let toggle = originalToggle;
+
+  if (companyField && label && originalToggle) {
+    label.classList.add("field-label-row");
+    toggle = document.createElement("button");
+    toggle.className = "field-inline-action";
+    toggle.type = "button";
+    toggle.id = "quickCompanyToggleInline";
+    toggle.textContent = "+ Cadastrar nova";
+    label.appendChild(toggle);
+    form?.classList.add("inline");
+    companyField.insertAdjacentElement("afterend", form);
+    box.remove();
+  }
+
+  toggle?.addEventListener("click", () => {
     form?.classList.toggle("hidden");
     form?.querySelector("[name='quickCompanyName']")?.focus();
   });

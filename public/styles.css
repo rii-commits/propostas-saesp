@@ -1041,6 +1041,7 @@ textarea:disabled {
 }
 
 .quick-company-box {
+  display: none;
   margin-top: 16px;
   border: 1px solid #fed7aa;
   border-radius: 12px;
@@ -1077,6 +1078,112 @@ textarea:disabled {
   padding: 16px;
   border-top: 1px solid #fed7aa;
   background: #fff;
+}
+
+.quick-company-form.inline {
+  grid-column: 2;
+  order: 2;
+  margin-top: -6px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+}
+
+.field-label-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.field-inline-action {
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0;
+}
+
+.proposal-card {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto 22px;
+  padding: 28px;
+  border-radius: 12px;
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 2px rgba(20, 27, 38, 0.04), 0 18px 42px rgba(20, 27, 38, 0.06);
+}
+
+#proposalForm .form-grid.three {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  padding-top: 34px;
+}
+
+#proposalForm .form-grid.three > .field:nth-child(1) { order: 1; }
+#proposalForm .form-grid.three > .field:nth-child(3) { order: 2; }
+#proposalForm .form-grid.three > .field:nth-child(2) { order: 3; }
+#proposalForm .form-grid.three > .field:nth-child(7) { order: 4; }
+#proposalForm .form-grid.three > .field:nth-child(5) { order: 5; }
+#proposalForm .form-grid.three > .field:nth-child(6) { order: 6; }
+#proposalForm .form-grid.three > .field:nth-child(10) { order: 7; }
+#proposalForm .form-grid.three > .field:nth-child(8) { order: 8; }
+#proposalForm .form-grid.three > .field:nth-child(4) { order: 9; }
+
+#proposalForm .form-grid.three > .field:nth-child(9) {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#proposalForm .form-grid.three > .field:nth-child(9) > span {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#proposalForm .form-grid.three > .field:nth-child(9) select {
+  min-height: 30px;
+  width: auto;
+  border-radius: 999px;
+  padding: 5px 26px 5px 10px;
+  background-color: #f3f4f6;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.proposal-extra-block {
+  margin-top: 20px;
+}
+
+#proposalForm > .actions {
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 20px !important;
+  padding-top: 18px;
+  border-top: 1px solid #edf0f5;
+}
+
+#proposalForm > .actions #regenerateBtn {
+  margin-right: auto;
+}
+
+#proposalForm > .actions .proposal-cancel-btn {
+  background: #fff;
+  border: 1px solid #dfe3ea;
+  color: #4b5563;
+}
+
+#proposalForm > .actions .proposal-save-btn {
+  min-height: 42px;
+  border-radius: 12px;
+  background: #eb6b3b;
+  color: #fff;
+  padding-inline: 18px;
 }
 
 .company-editor-header {
@@ -1295,8 +1402,8 @@ textarea.editor {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(120, 194, 200, 0.28);
+  border-color: #14427d;
+  box-shadow: 0 0 0 3px rgba(20, 66, 125, 0.16);
 }
 
 .native-searchable-select {
@@ -1932,8 +2039,29 @@ tbody tr:nth-child(even) td {
 
   .company-toolbar,
   .company-card,
-  .integrated-section-grid {
+  .integrated-section-grid,
+  #proposalForm .form-grid.three {
     grid-template-columns: 1fr;
+  }
+
+  #proposalForm .form-grid.three > .field,
+  .quick-company-form.inline {
+    grid-column: auto;
+  }
+
+  #proposalForm .form-grid.three > .field:nth-child(9) {
+    position: static;
+    justify-content: flex-start;
+    order: 0;
+  }
+
+  #proposalForm .form-grid.three {
+    padding-top: 0;
+  }
+
+  #proposalForm > .actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .company-card {
