@@ -2,7 +2,8 @@ const state = {
   user: null,
   data: null,
   route: location.pathname,
-  toastTimer: null
+  toastTimer: null,
+  sidebarExpanded: false
 };
 
 const routes = [
@@ -21,6 +22,14 @@ const routes = [
 const variables = ["empresa", "endereco", "evento", "data", "data_evento", "local", "valor", "responsavel", "responsavel_interno", "contrapartidas", "codigo", "conteudo"];
 const proposalStatuses = ["Rascunho", "Enviada", "Aprovada", "Recusada", "Cancelada", "Final"];
 const workflowStages = ["Em confeccao", "Proposta enviada", "Em formalizacao", "Em realizacao", "Finalizado", "Declinios"];
+const workflowAccentColors = {
+  "Em confeccao": "#14427d",
+  "Proposta enviada": "#eb6b3b",
+  "Em formalizacao": "#476b9d",
+  "Em realizacao": "#6b7280",
+  "Finalizado": "#157347",
+  "Declinios": "#9ca3af"
+};
 const workflowLabels = {
   "Em confeccao": "Em confecção",
   "Proposta enviada": "Proposta enviada",
@@ -353,20 +362,24 @@ async function createRecoveryCodeChallenge(verifier) {
 function renderApp() {
   const active = normalizeRoute(state.route);
   app().innerHTML = `
-    <div class="app-shell">
+    <div class="app-shell ${state.sidebarExpanded ? "sidebar-expanded" : ""}">
       <aside class="sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Alternar menu" aria-pressed="${state.sidebarExpanded ? "true" : "false"}">
+          ${routeIcon("menu")}
+        </button>
         <div class="brand">
           <img class="brand-logo" src="/saesp-logo.png" alt="SAESP">
           <div><strong>Propostas</strong><span>Gestão comercial</span></div>
         </div>
         <nav class="nav">
           ${routes.map(route => `
-            <button class="${active === route.path ? "active" : ""}" data-route="${route.path}" ${route.path === "/usuarios" && !canAdmin() ? "disabled" : ""}>
-              <span class="icon">${route.icon}</span><span>${route.label}</span>
+            <button class="${active === route.path ? "active" : ""}" data-route="${route.path}" title="${escapeAttr(route.label)}" ${route.path === "/usuarios" && !canAdmin() ? "disabled" : ""}>
+              <span class="icon">${routeIcon(route.path)}</span><span class="nav-label">${route.label}</span>
             </button>
           `).join("")}
         </nav>
         <div class="user-box">
+          <div class="user-avatar">${escapeHtml(userInitials(state.user.name))}</div>
           <strong>${escapeHtml(state.user.name)}</strong>
           <span>${escapeHtml(state.user.role)} · ${escapeHtml(state.user.email)}</span>
           <button class="btn ghost" id="logoutBtn" style="width:100%;margin-top:12px">Sair</button>
@@ -378,6 +391,10 @@ function renderApp() {
 
   document.querySelectorAll("[data-route]").forEach(button => {
     button.addEventListener("click", () => navigate(button.dataset.route));
+  });
+  document.getElementById("sidebarToggle")?.addEventListener("click", () => {
+    state.sidebarExpanded = !state.sidebarExpanded;
+    renderApp();
   });
   document.getElementById("logoutBtn").addEventListener("click", async () => {
     await api("/api/logout", { method: "POST", body: JSON.stringify({}) }).catch(() => {});
@@ -400,6 +417,33 @@ function renderApp() {
   else if (active === "/historico") renderHistory(main);
   else if (active === "/usuarios" && canAdmin()) renderCrud(main, userConfig());
   else renderDashboard(main);
+}
+
+function userInitials(name) {
+  return String(name || "U")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0] || "")
+    .join("")
+    .toUpperCase();
+}
+
+function routeIcon(key) {
+  const icons = {
+    "menu": `<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>`,
+    "/dashboard": `<rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/>`,
+    "/kanban": `<rect width="5" height="16" x="3" y="4" rx="1.5"/><rect width="5" height="10" x="9.5" y="4" rx="1.5"/><rect width="5" height="14" x="16" y="4" rx="1.5"/>`,
+    "/empresas": `<path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M4 21h16"/><path d="M9 7h1"/><path d="M14 7h1"/><path d="M9 11h1"/><path d="M14 11h1"/><path d="M9 15h1"/><path d="M14 15h1"/>`,
+    "/eventos": `<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/>`,
+    "/modelos": `<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>`,
+    "/contrapartidas": `<path d="M7 7h12l-3-3"/><path d="M17 17H5l3 3"/><path d="M5 17l3-3"/><path d="M19 7l-3 3"/>`,
+    "/propostas": `<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>`,
+    "/controle": `<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>`,
+    "/historico": `<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/>`,
+    "/usuarios": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>`
+  };
+  return `<svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[key] || icons["/dashboard"]}</svg>`;
 }
 
 function normalizeRoute(route) {
@@ -902,8 +946,9 @@ function renderKanban(main) {
 }
 
 function kanbanCard(item) {
+  const accentColor = workflowAccentColors[item.workflowStage] || "#14427d";
   return `
-    <article class="kanban-card ${item.followUpOverdue ? "follow-up-overdue" : ""}" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
+    <article class="kanban-card ${item.followUpOverdue ? "follow-up-overdue" : ""}" style="--kanban-accent:${escapeAttr(accentColor)}" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
       <div class="kanban-card-title">
         <strong>${escapeHtml(item.title)}</strong>
       </div>
