@@ -613,6 +613,17 @@ function dashboardStageChart(proposals) {
   `;
 }
 
+function dashboardStatusColor(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized.includes("enviada")) return "#8ec5ff";
+  if (normalized.includes("aprovada")) return "#14427d";
+  if (normalized.includes("final")) return "#eb6b3b";
+  if (normalized.includes("recusada") || normalized.includes("decl")) return "#98a2b3";
+  if (normalized.includes("rascunho")) return "#d0d5dd";
+  if (normalized.includes("cancel")) return "#cbd5e1";
+  return "#476b9d";
+}
+
 function dashboardStatusChart(proposals) {
   const statusCounts = proposalStatuses.map(status => ({
     status,
@@ -620,12 +631,11 @@ function dashboardStatusChart(proposals) {
   })).filter(item => item.count);
   const total = Math.max(proposals.length, 1);
   let cursor = 0;
-  const colors = ["#14427d", "#78c2c8", "#2f855a", "#b42318", "#7a5af8", "#e3541e"];
   const gradient = statusCounts.length
-    ? statusCounts.map((item, index) => {
+    ? statusCounts.map(item => {
       const start = cursor;
       cursor += (item.count / total) * 100;
-      return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+      return `${dashboardStatusColor(item.status)} ${start}% ${cursor}%`;
     }).join(", ")
     : "#dfe3ea 0% 100%";
 
@@ -640,8 +650,8 @@ function dashboardStatusChart(proposals) {
       <div class="status-chart">
         <div class="donut" style="--donut: conic-gradient(${gradient})"><strong>${proposals.length}</strong><span>propostas</span></div>
         <div class="status-legend">
-          ${statusCounts.map((item, index) => `
-            <span><i style="--legend-color:${colors[index % colors.length]}"></i>${escapeHtml(item.status)} <strong>${item.count}</strong></span>
+          ${statusCounts.map(item => `
+            <span><i style="--legend-color:${dashboardStatusColor(item.status)}"></i>${escapeHtml(item.status)} <strong>${item.count}</strong></span>
           `).join("") || `<span><i></i>Sem propostas <strong>0</strong></span>`}
         </div>
       </div>
