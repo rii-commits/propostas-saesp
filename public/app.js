@@ -1775,7 +1775,6 @@ function eventCard(event) {
     event.description,
     template?.name,
     template?.type,
-    regionLabel,
     volumeLabel,
     templateLabel,
     "evento externo"
@@ -1786,7 +1785,6 @@ function eventCard(event) {
       <button class="event-card-main" type="button" data-edit-event="${escapeAttr(event.id)}">
         <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
         <span class="event-card-template ${template ? "ready" : "pending"}">${escapeHtml(templateLabel)}</span>
-        <span class="event-card-meta">${routeIcon("map-pin")}${escapeHtml(regionLabel)}</span>
         <span class="event-card-meta">${routeIcon("calendar-days")}${escapeHtml(volumeLabel)}</span>
       </button>
     </article>
@@ -2017,10 +2015,10 @@ function bindIntegratedEventForm(config, panel, item = null) {
         method: item ? "PUT" : "POST",
         body: JSON.stringify({
           name: data.get("name"),
-          date: data.get("date"),
-          location: data.get("location"),
+          date: "",
+          location: "",
           companyId: item?.companyId || "",
-          description: data.get("description")
+          description: ""
         })
       });
 
@@ -2062,10 +2060,7 @@ function integratedEventConfig() {
           <div class="integrated-form-section full">
             <div class="integrated-section-title"><strong>Evento</strong><span>Dados principais usados nas propostas</span></div>
             <div class="integrated-section-grid">
-              ${input("name", "Nome do evento", item?.name, true)}
-              ${input("date", "Data do evento", item?.date, false, "date")}
-              ${input("location", "Local", item?.location)}
-              ${textarea("description", "Descricao", item?.description, "full")}
+              <label class="field full"><span>Nome do evento</span><input name="name" type="text" value="${escapeAttr(item?.name || "")}" required ${!canWrite() ? "disabled" : ""}></label>
             </div>
           </div>
           <div class="integrated-form-section full">
