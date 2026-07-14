@@ -1824,12 +1824,13 @@ function bindEventGallerySearch(scope) {
 
 function renderCrud(main, config) {
   const rows = state.data[config.collection];
+  const listClass = config.gallery ? "gallery-wrap" : "table-wrap";
   main.innerHTML = `
-    ${pageHeader(config.title, config.subtitle, config.canCreate === false ? "" : `<button class="btn primary" id="newItemBtn" ${!canWrite() && config.collection !== "users" ? "disabled" : ""}>Novo</button>`)}
+    ${pageHeader(config.title, config.subtitle, config.canCreate === false ? "" : `<button class="btn primary ${config.collection === "templates" ? "template-new-btn" : ""}" id="newItemBtn" ${!canWrite() && config.collection !== "users" ? "disabled" : ""}>Novo</button>`)}
     ${config.importPanel ? config.importPanel() : ""}
     ${config.filterPanel ? config.filterPanel() : ""}
     <section class="panel hidden" id="formPanel">${config.form()}</section>
-    <div class="table-wrap">${config.table(rows)}</div>
+    <div class="${listClass}">${config.table(rows)}</div>
   `;
 
   const panel = main.querySelector("#formPanel");
@@ -1846,9 +1847,15 @@ function renderCrud(main, config) {
       panel.classList.remove("hidden");
       bindCrudForm(config, panel, item);
     });
+    button.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      button.click();
+    });
   });
   main.querySelectorAll("[data-delete]").forEach(button => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", async event => {
+      event.stopPropagation();
       if (!confirm("Remover este registro?")) return;
       try {
         await api(`/api/${config.collection}/${button.dataset.delete}`, { method: "DELETE" });
@@ -2055,7 +2062,8 @@ function templateConfig() {
       ...Object.fromEntries(form),
       variables: variables.filter(key => node.querySelector("[name='content']").value.includes(`{{${key}}}`))
     }),
-    table: rows => simpleTable(rows, ["Nome", "Tipo", "Variáveis", "Arquivo"], row => [row.name, row.type, (row.variables || []).join(", "), row.importedFileName || ""])
+    gallery: true,
+    table: rows => templateGallery(rows)
   };
 }
 
@@ -2149,6 +2157,35 @@ function simpleTable(rows, headings, cells) {
         `).join("")}
       </tbody>
     </table>
+  `;
+}
+
+function trashIcon() {
+  return `
+    <svg class="template-delete-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/>
+      <path d="M14 11v6"/>
+    </svg>
+  `;
+}
+
+function templateGallery(rows) {
+  if (!rows.length) return `<div class="empty">Nenhum modelo encontrado.</div>`;
+  return `
+    <div class="template-gallery">
+      ${rows.map(row => `
+        <article class="template-card" role="button" tabindex="0" data-edit="${escapeAttr(row.id)}">
+          <span class="template-type-badge">${escapeHtml(row.type || "Modelo")}</span>
+          <strong>${escapeHtml(row.name || "Modelo sem titulo")}</strong>
+          <button class="template-delete-btn" type="button" data-delete="${escapeAttr(row.id)}" aria-label="Excluir modelo ${escapeAttr(row.name || "")}" ${!canWrite() ? "disabled" : ""}>
+            ${trashIcon()}
+          </button>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
