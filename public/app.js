@@ -1972,6 +1972,7 @@ function renderCrud(main, config) {
 function bindCrudForm(config, panel, item = null) {
   const form = panel.querySelector("form");
   bindVariableButtons(panel);
+  bindCopyVariableButtons(panel);
   bindImportButtons(panel);
   enhanceSearchableSelects(panel);
   if (config.collection === "events") {
@@ -1995,12 +1996,41 @@ function bindCrudForm(config, panel, item = null) {
   panel.querySelector("[data-cancel]")?.addEventListener("click", () => panel.classList.add("hidden"));
 }
 
+function bindCopyVariableButtons(scope) {
+  scope.querySelectorAll("[data-copy-var]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const value = button.dataset.copyVar || "";
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = value;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        toast(`Variável ${value} copiada.`);
+      } catch {
+        toast(`Copie manualmente: ${value}`);
+      }
+    });
+  });
+}
+
 function bindIntegratedEventForm(config, panel, item = null) {
   const form = panel.querySelector("form");
   const eventNameInput = form.querySelector("[name='name']");
   const templateNameInput = form.querySelector("[name='templateName']");
   eventNameInput?.addEventListener("input", () => {
     if (!templateNameInput) return;
+    if (templateNameInput.dataset.syncTemplateName === "true") {
+      templateNameInput.value = eventNameInput.value;
+      return;
+    }
     const current = String(templateNameInput.value || "");
     if (!current || current === "Modelo - " || current.startsWith("Modelo - ")) {
       templateNameInput.value = `Modelo - ${eventNameInput.value}`;
@@ -2025,7 +2055,7 @@ function bindIntegratedEventForm(config, panel, item = null) {
       const linkedTemplate = item ? findTemplateForEvent(item) : null;
       const content = data.get("templateContent") || defaultProposalTemplateContent();
       const templatePayload = {
-        name: data.get("templateName") || savedEvent.name || "Carta proposta",
+        name: data.get("name") || savedEvent.name || "Carta proposta",
         type: data.get("templateType") || "Evento externo",
         content,
         variables: variables.filter(key => String(content).includes(`{{${key}}}`)),
@@ -2055,34 +2085,33 @@ function integratedEventConfig() {
     form: item => {
       const linkedTemplate = findTemplateForEvent(item);
       const templateContent = linkedTemplate?.content || defaultProposalTemplateContent();
+      const usefulVariables = ["empresa", "valor", "data", "evento", "responsavel", "contrapartidas", "codigo"];
       return `
-        <form class="form-grid integrated-event-form">
-          <div class="integrated-form-section full">
-            <div class="integrated-section-title"><strong>Evento</strong><span>Dados principais usados nas propostas</span></div>
-            <div class="integrated-section-grid">
-              <label class="field full"><span>Nome do evento</span><input name="name" type="text" value="${escapeAttr(item?.name || "")}" required ${!canWrite() ? "disabled" : ""}></label>
-            </div>
-          </div>
-          <div class="integrated-form-section full">
-            <div class="integrated-section-title"><strong>Carta proposta</strong><span>Modelo usado automaticamente para este evento</span></div>
-            <div class="integrated-section-grid">
-              ${input("templateName", "Nome da carta proposta", linkedTemplate?.name || item?.name || "")}
-              ${input("templateType", "Tipo", linkedTemplate?.type || "Evento externo")}
-              <div class="field full">
-                <label>Importar Word</label>
-                <input type="file" id="docxImport" accept=".docx">
-                <input type="hidden" name="importedFileName" value="${escapeAttr(linkedTemplate?.importedFileName || "")}">
-                <input type="hidden" name="importedFilePath" value="${escapeAttr(linkedTemplate?.importedFilePath || "")}">
-                <input type="hidden" name="storagePath" value="${escapeAttr(linkedTemplate?.storagePath || linkedTemplate?.importedFilePath || "")}">
+        <form class="model-edit-form">
+          <section class="model-edit-topbar">
+            <label class="field model-event-name"><span>Nome do evento</span><input name="name" type="text" value="${escapeAttr(item?.name || "")}" required ${!canWrite() ? "disabled" : ""}></label>
+            <input type="hidden" name="templateName" data-sync-template-name="true" value="${escapeAttr(linkedTemplate?.name || item?.name || "")}">
+            <input type="hidden" name="templateType" value="${escapeAttr(linkedTemplate?.type || "Evento externo")}">
+            <input type="hidden" name="importedFileName" value="${escapeAttr(linkedTemplate?.importedFileName || "")}">
+            <input type="hidden" name="importedFilePath" value="${escapeAttr(linkedTemplate?.importedFilePath || "")}">
+            <input type="hidden" name="storagePath" value="${escapeAttr(linkedTemplate?.storagePath || linkedTemplate?.importedFilePath || "")}">
+            <div class="model-variable-strip" aria-label="Variáveis úteis">
+              <span>Variáveis úteis</span>
+              <div>
+                ${usefulVariables.map(key => `<button class="model-variable-chip" type="button" data-copy-var="{{${key}}}">{{${key}}}</button>`).join("")}
               </div>
-              <div class="field full">
-                <label>Variaveis</label>
-                <div class="variables">${variables.map(key => `<button type="button" data-insert-var="{{${key}}}">{{${key}}}</button>`).join("")}</div>
-              </div>
-              ${textarea("templateContent", "Conteudo", templateContent, "full editor")}
             </div>
-          </div>
-          ${formActions()}
+            <div class="model-edit-actions">
+              <button class="btn model-back-btn" type="button" data-cancel>Voltar</button>
+              <button class="btn primary model-save-btn" type="submit" ${!canWrite() ? "disabled" : ""}>Salvar Alterações</button>
+            </div>
+          </section>
+          <section class="model-editor-shell">
+            <label class="model-editor-label" for="templateContentEditor">Modelo de carta proposta</label>
+            <div class="model-paper-wrap">
+              <textarea id="templateContentEditor" class="model-editor-textarea" name="templateContent" ${!canWrite() ? "disabled" : ""}>${escapeHtml(templateContent || "")}</textarea>
+            </div>
+          </section>
         </form>
       `;
     },
