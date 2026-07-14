@@ -10,8 +10,7 @@ const routes = [
   { path: "/dashboard", label: "Dashboard", icon: "⌂" },
   { path: "/kanban", label: "Kanban", icon: "▦" },
   { path: "/empresas", label: "Empresas", icon: "□" },
-  { path: "/eventos", label: "Eventos externos", icon: "◇" },
-  { path: "/modelos", label: "Modelos", icon: "T" },
+  { path: "/eventos", label: "Eventos e modelos", icon: "◇" },
   { path: "/contrapartidas", label: "Contrapartidas", icon: "+" },
   { path: "/propostas", label: "Propostas", icon: "✎" },
   { path: "/controle", label: "Controle", icon: "#" },
@@ -453,6 +452,7 @@ function routeIcon(key) {
 
 function normalizeRoute(route) {
   if (!route || route === "/" || route === "/login") return "/dashboard";
+  if (route === "/modelos") return "/eventos";
   return route;
 }
 
@@ -1691,30 +1691,57 @@ function bindCompanyGallerySearch(scope) {
 }
 
 function renderEvents(main) {
-  const config = eventConfig();
+  const eventCrud = eventConfig();
+  const templateCrud = templateConfig();
   const rows = [...state.data.events].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+  const templates = [...state.data.templates].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
   const linkedProposals = state.data.proposals.filter(proposal => proposal.eventId).length;
   main.innerHTML = `
-    ${pageHeader("Eventos externos", "Cursos e atividades externas usados na criacao das propostas.", canWrite() ? `<button class="btn primary" id="newEventBtn">Novo evento externo</button>` : "")}
+    ${pageHeader("Eventos e modelos", "Centralize cursos, atividades externas e cartas base em uma unica area.", canWrite() ? `
+      <button class="btn" id="newTemplateBtn">Novo modelo</button>
+      <button class="btn primary" id="newEventBtn">Novo evento externo</button>
+    ` : "")}
     <section class="company-toolbar panel">
-      <label class="field"><span>Buscar evento externo</span><input id="eventGallerySearch" placeholder="Nome do curso ou atividade"></label>
+      <label class="field"><span>Buscar</span><input id="eventGallerySearch" placeholder="Evento, modelo, tipo ou atividade"></label>
       <div class="company-count" id="eventGalleryCount"></div>
     </section>
-    <section class="panel hidden company-editor event-editor" id="formPanel">${config.form()}</section>
-    <section class="event-gallery" id="eventGallery">
-      ${eventGallery(rows)}
+    <section class="panel hidden company-editor event-editor" id="eventFormPanel">${eventCrud.form()}</section>
+    <section class="panel hidden company-editor template-editor" id="templateFormPanel">${templateCrud.form()}</section>
+    <section class="unified-gallery-section">
+      <div class="unified-section-header">
+        <div><span>Eventos externos</span><strong>${rows.length}</strong></div>
+      </div>
+      <div class="event-gallery" id="eventGallery">
+        ${eventGallery(rows)}
+      </div>
+    </section>
+    <section class="unified-gallery-section">
+      <div class="unified-section-header">
+        <div><span>Modelos de proposta</span><strong>${templates.length}</strong></div>
+      </div>
+      <div class="gallery-wrap">
+        ${templateGallery(templates)}
+      </div>
     </section>
     <section class="company-overview event-overview event-overview-bottom">
       <div><span>Eventos externos cadastrados</span><strong>${rows.length}</strong></div>
+      <div><span>Modelos cadastrados</span><strong>${templates.length}</strong></div>
       <div><span>Propostas vinculadas</span><strong>${linkedProposals}</strong></div>
     </section>
   `;
 
-  const panel = main.querySelector("#formPanel");
+  const eventPanel = main.querySelector("#eventFormPanel");
+  const templatePanel = main.querySelector("#templateFormPanel");
   main.querySelector("#newEventBtn")?.addEventListener("click", () => {
-    openEventEditor(panel, config);
+    templatePanel.classList.add("hidden");
+    openEventEditor(eventPanel, eventCrud);
   });
-  bindEventCards(main, rows, config, panel);
+  main.querySelector("#newTemplateBtn")?.addEventListener("click", () => {
+    eventPanel.classList.add("hidden");
+    openTemplateEditor(templatePanel, templateCrud);
+  });
+  bindEventCards(main, rows, eventCrud, eventPanel, templatePanel);
+  bindTemplateCards(main, templates, templateCrud, templatePanel, eventPanel);
   bindEventGallerySearch(main);
 }
 
@@ -1741,7 +1768,8 @@ function eventCard(event) {
     event.name,
     event.description,
     regionLabel,
-    volumeLabel
+    volumeLabel,
+    "evento externo"
   ].join(" ").toLowerCase();
 
   return `
@@ -1772,14 +1800,61 @@ function openEventEditor(panel, config, item = null) {
   bindEventDeleteActions(panel);
 }
 
-function bindEventCards(scope, rows, config, panel) {
+function bindEventCards(scope, rows, config, panel, templatePanel = null) {
   scope.querySelectorAll("[data-edit-event]").forEach(card => {
     card.addEventListener("click", () => {
       const item = rows.find(row => row.id === card.dataset.editEvent);
-      if (item) openEventEditor(panel, config, item);
+      if (!item) return;
+      templatePanel?.classList.add("hidden");
+      openEventEditor(panel, config, item);
     });
   });
   bindEventDeleteActions(scope);
+}
+
+function openTemplateEditor(panel, config, item = null) {
+  panel.innerHTML = `
+    <div class="company-editor-header">
+      <div>
+        <span>${item ? "Editar modelo" : "Novo modelo"}</span>
+        <h2>${escapeHtml(item?.name || "Cadastro de modelo")}</h2>
+      </div>
+    </div>
+    ${config.form(item)}
+  `;
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  bindCrudForm(config, panel, item);
+}
+
+function bindTemplateCards(scope, rows, config, panel, eventPanel = null) {
+  scope.querySelectorAll("[data-edit]").forEach(card => {
+    card.addEventListener("click", () => {
+      const item = rows.find(row => row.id === card.dataset.edit);
+      if (!item) return;
+      eventPanel?.classList.add("hidden");
+      openTemplateEditor(panel, config, item);
+    });
+    card.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      card.click();
+    });
+  });
+  scope.querySelectorAll("[data-delete]").forEach(button => {
+    button.addEventListener("click", async event => {
+      event.stopPropagation();
+      const item = rows.find(row => row.id === button.dataset.delete);
+      if (!item || !confirm(`Remover o modelo "${item.name}"?`)) return;
+      try {
+        await api(`/api/${config.collection}/${button.dataset.delete}`, { method: "DELETE" });
+        toast("Modelo removido.");
+        await reload();
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+  });
 }
 
 function bindEventDeleteActions(scope) {
@@ -1807,16 +1882,24 @@ function bindEventDeleteActions(scope) {
 function bindEventGallerySearch(scope) {
   const input = scope.querySelector("#eventGallerySearch");
   const count = scope.querySelector("#eventGalleryCount");
-  const cards = Array.from(scope.querySelectorAll("[data-event-card]"));
+  const cards = Array.from(scope.querySelectorAll("[data-event-card], [data-template-card]"));
   const applySearch = () => {
     const query = (input?.value || "").toLowerCase().trim();
     let visible = 0;
+    let visibleEvents = 0;
+    let visibleTemplates = 0;
     cards.forEach(card => {
       const matches = !query || card.dataset.search.includes(query);
       card.classList.toggle("hidden", !matches);
       if (matches) visible += 1;
+      if (matches && card.hasAttribute("data-event-card")) visibleEvents += 1;
+      if (matches && card.hasAttribute("data-template-card")) visibleTemplates += 1;
     });
-    if (count) count.textContent = `${visible} ${visible === 1 ? "evento" : "eventos"}`;
+    if (count) {
+      count.textContent = query
+        ? `${visible} resultado${visible === 1 ? "" : "s"} (${visibleEvents} evento${visibleEvents === 1 ? "" : "s"}, ${visibleTemplates} modelo${visibleTemplates === 1 ? "" : "s"})`
+        : `${visibleEvents} evento${visibleEvents === 1 ? "" : "s"} · ${visibleTemplates} modelo${visibleTemplates === 1 ? "" : "s"}`;
+    }
   };
   input?.addEventListener("input", applySearch);
   applySearch();
@@ -2176,15 +2259,24 @@ function templateGallery(rows) {
   if (!rows.length) return `<div class="empty">Nenhum modelo encontrado.</div>`;
   return `
     <div class="template-gallery">
-      ${rows.map(row => `
-        <article class="template-card" role="button" tabindex="0" data-edit="${escapeAttr(row.id)}">
-          <span class="template-type-badge">${escapeHtml(row.type || "Modelo")}</span>
-          <strong>${escapeHtml(row.name || "Modelo sem titulo")}</strong>
-          <button class="template-delete-btn" type="button" data-delete="${escapeAttr(row.id)}" aria-label="Excluir modelo ${escapeAttr(row.name || "")}" ${!canWrite() ? "disabled" : ""}>
-            ${trashIcon()}
-          </button>
-        </article>
-      `).join("")}
+      ${rows.map(row => {
+        const searchText = [
+          row.name,
+          row.type,
+          row.importedFileName,
+          ...(row.variables || []),
+          "modelo proposta carta"
+        ].join(" ").toLowerCase();
+        return `
+          <article class="template-card" role="button" tabindex="0" data-template-card data-search="${escapeAttr(searchText)}" data-edit="${escapeAttr(row.id)}">
+            <span class="template-type-badge">${escapeHtml(row.type || "Modelo")}</span>
+            <strong>${escapeHtml(row.name || "Modelo sem titulo")}</strong>
+            <button class="template-delete-btn" type="button" data-delete="${escapeAttr(row.id)}" aria-label="Excluir modelo ${escapeAttr(row.name || "")}" ${!canWrite() ? "disabled" : ""}>
+              ${trashIcon()}
+            </button>
+          </article>
+        `;
+      }).join("")}
     </div>
   `;
 }

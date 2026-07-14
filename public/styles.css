@@ -1260,6 +1260,45 @@ textarea:disabled {
   margin-top: 18px;
 }
 
+.unified-gallery-section {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.unified-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.unified-section-header div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.unified-section-header span {
+  color: var(--brand);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.unified-section-header strong {
+  min-width: 28px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: #eef3f8;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .gallery-wrap {
   background: transparent;
 }
