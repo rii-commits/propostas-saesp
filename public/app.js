@@ -1690,58 +1690,62 @@ function bindCompanyGallerySearch(scope) {
   applySearch();
 }
 
+function normalizeModelName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function findTemplateForEvent(event) {
+  if (!event) return null;
+  const eventName = normalizeModelName(event.name);
+  const prefixedName = normalizeModelName(`Modelo - ${event.name}`);
+  const namedTemplate = state.data.templates.find(template => {
+    const templateName = normalizeModelName(template.name);
+    return templateName === eventName || templateName === prefixedName;
+  });
+  if (namedTemplate) return namedTemplate;
+
+  const linkedProposal = state.data.proposals.find(proposal => proposal.eventId === event.id && proposal.templateId);
+  return linkedProposal ? byId("templates", linkedProposal.templateId) : null;
+}
+
 function renderEvents(main) {
-  const eventCrud = eventConfig();
-  const templateCrud = templateConfig();
+  const eventCrud = integratedEventConfig();
   const rows = [...state.data.events].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
-  const templates = [...state.data.templates].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+  const linkedTemplates = rows.filter(event => findTemplateForEvent(event)).length;
   const linkedProposals = state.data.proposals.filter(proposal => proposal.eventId).length;
   main.innerHTML = `
     ${pageHeader("Eventos e modelos", "Centralize cursos, atividades externas e cartas base em uma unica area.", canWrite() ? `
-      <button class="btn" id="newTemplateBtn">Novo modelo</button>
-      <button class="btn primary" id="newEventBtn">Novo evento externo</button>
+      <button class="btn primary" id="newEventBtn">Novo evento e proposta</button>
     ` : "")}
     <section class="company-toolbar panel">
-      <label class="field"><span>Buscar</span><input id="eventGallerySearch" placeholder="Evento, modelo, tipo ou atividade"></label>
+      <label class="field"><span>Buscar</span><input id="eventGallerySearch" placeholder="Evento, carta proposta ou atividade"></label>
       <div class="company-count" id="eventGalleryCount"></div>
     </section>
     <section class="panel hidden company-editor event-editor" id="eventFormPanel">${eventCrud.form()}</section>
-    <section class="panel hidden company-editor template-editor" id="templateFormPanel">${templateCrud.form()}</section>
     <section class="unified-gallery-section">
       <div class="unified-section-header">
-        <div><span>Eventos externos</span><strong>${rows.length}</strong></div>
+        <div><span>Eventos com proposta integrada</span><strong>${rows.length}</strong></div>
       </div>
       <div class="event-gallery" id="eventGallery">
         ${eventGallery(rows)}
       </div>
     </section>
-    <section class="unified-gallery-section">
-      <div class="unified-section-header">
-        <div><span>Modelos de proposta</span><strong>${templates.length}</strong></div>
-      </div>
-      <div class="gallery-wrap">
-        ${templateGallery(templates)}
-      </div>
-    </section>
     <section class="company-overview event-overview event-overview-bottom">
       <div><span>Eventos externos cadastrados</span><strong>${rows.length}</strong></div>
-      <div><span>Modelos cadastrados</span><strong>${templates.length}</strong></div>
+      <div><span>Cartas integradas</span><strong>${linkedTemplates}</strong></div>
       <div><span>Propostas vinculadas</span><strong>${linkedProposals}</strong></div>
     </section>
   `;
 
   const eventPanel = main.querySelector("#eventFormPanel");
-  const templatePanel = main.querySelector("#templateFormPanel");
   main.querySelector("#newEventBtn")?.addEventListener("click", () => {
-    templatePanel.classList.add("hidden");
     openEventEditor(eventPanel, eventCrud);
   });
-  main.querySelector("#newTemplateBtn")?.addEventListener("click", () => {
-    eventPanel.classList.add("hidden");
-    openTemplateEditor(templatePanel, templateCrud);
-  });
-  bindEventCards(main, rows, eventCrud, eventPanel, templatePanel);
-  bindTemplateCards(main, templates, templateCrud, templatePanel, eventPanel);
+  bindEventCards(main, rows, eventCrud, eventPanel);
   bindEventGallerySearch(main);
 }
 
@@ -1752,6 +1756,7 @@ function eventGallery(rows) {
 
 function eventCard(event) {
   const proposals = state.data.proposals.filter(proposal => proposal.eventId === event.id);
+  const template = findTemplateForEvent(event);
   const currentYear = String(new Date().getFullYear());
   const citiesThisYear = Array.from(new Set(proposals
     .filter(proposal => String(proposal.controlYear || proposal.issuedAt || proposal.createdAt || "").includes(currentYear))
@@ -1764,11 +1769,15 @@ function eventCard(event) {
   const volumeLabel = proposals.length
     ? `${proposals.length} ${proposals.length === 1 ? "proposta ativa" : "propostas ativas"}`
     : "Sem propostas ativas";
+  const templateLabel = template ? "Carta proposta cadastrada" : "Carta proposta pendente";
   const searchText = [
     event.name,
     event.description,
+    template?.name,
+    template?.type,
     regionLabel,
     volumeLabel,
+    templateLabel,
     "evento externo"
   ].join(" ").toLowerCase();
 
@@ -1776,6 +1785,7 @@ function eventCard(event) {
     <article class="event-card" data-event-card data-search="${escapeAttr(searchText)}">
       <button class="event-card-main" type="button" data-edit-event="${escapeAttr(event.id)}">
         <strong>${escapeHtml(event.name || "Curso sem nome")}</strong>
+        <span class="event-card-template ${template ? "ready" : "pending"}">${escapeHtml(templateLabel)}</span>
         <span class="event-card-meta">${routeIcon("map-pin")}${escapeHtml(regionLabel)}</span>
         <span class="event-card-meta">${routeIcon("calendar-days")}${escapeHtml(volumeLabel)}</span>
       </button>
@@ -1887,19 +1897,13 @@ function bindEventGallerySearch(scope) {
     const query = (input?.value || "").toLowerCase().trim();
     let visible = 0;
     let visibleEvents = 0;
-    let visibleTemplates = 0;
     cards.forEach(card => {
       const matches = !query || card.dataset.search.includes(query);
       card.classList.toggle("hidden", !matches);
       if (matches) visible += 1;
       if (matches && card.hasAttribute("data-event-card")) visibleEvents += 1;
-      if (matches && card.hasAttribute("data-template-card")) visibleTemplates += 1;
     });
-    if (count) {
-      count.textContent = query
-        ? `${visible} resultado${visible === 1 ? "" : "s"} (${visibleEvents} evento${visibleEvents === 1 ? "" : "s"}, ${visibleTemplates} modelo${visibleTemplates === 1 ? "" : "s"})`
-        : `${visibleEvents} evento${visibleEvents === 1 ? "" : "s"} · ${visibleTemplates} modelo${visibleTemplates === 1 ? "" : "s"}`;
-    }
+    if (count) count.textContent = `${visibleEvents || visible} evento${(visibleEvents || visible) === 1 ? "" : "s"}`;
   };
   input?.addEventListener("input", applySearch);
   applySearch();
@@ -2020,29 +2024,76 @@ function bindIntegratedEventForm(config, panel, item = null) {
         })
       });
 
-      if (!item && data.get("createTemplate") === "on") {
-        const content = data.get("templateContent") || defaultProposalTemplateContent();
-        await api("/api/templates", {
-          method: "POST",
-          body: JSON.stringify({
-            name: data.get("templateName") || `Modelo - ${savedEvent.name}`,
-            type: data.get("templateType") || "Carta proposta",
-            content,
-            variables: variables.filter(key => String(content).includes(`{{${key}}}`)),
-            importedFileName: data.get("importedFileName"),
-            importedFilePath: data.get("importedFilePath"),
-            storagePath: data.get("storagePath")
-          })
-        });
-      }
+      const linkedTemplate = item ? findTemplateForEvent(item) : null;
+      const content = data.get("templateContent") || defaultProposalTemplateContent();
+      const templatePayload = {
+        name: data.get("templateName") || savedEvent.name || "Carta proposta",
+        type: data.get("templateType") || "Evento externo",
+        content,
+        variables: variables.filter(key => String(content).includes(`{{${key}}}`)),
+        importedFileName: data.get("importedFileName"),
+        importedFilePath: data.get("importedFilePath"),
+        storagePath: data.get("storagePath")
+      };
+      await api(`/api/templates${linkedTemplate ? `/${linkedTemplate.id}` : ""}`, {
+        method: linkedTemplate ? "PUT" : "POST",
+        body: JSON.stringify(templatePayload)
+      });
 
-      toast(item ? "Evento salvo." : "Evento e modelo da carta salvos.");
+      toast("Evento e carta proposta salvos.");
       await reload();
     } catch (error) {
       toast(error.message);
     }
   });
   panel.querySelector("[data-cancel]")?.addEventListener("click", () => panel.classList.add("hidden"));
+}
+
+function integratedEventConfig() {
+  return {
+    title: "Eventos externos",
+    subtitle: "Cursos e atividades externas usados nas propostas.",
+    collection: "events",
+    form: item => {
+      const linkedTemplate = findTemplateForEvent(item);
+      const templateContent = linkedTemplate?.content || defaultProposalTemplateContent();
+      return `
+        <form class="form-grid integrated-event-form">
+          <div class="integrated-form-section full">
+            <div class="integrated-section-title"><strong>Evento</strong><span>Dados principais usados nas propostas</span></div>
+            <div class="integrated-section-grid">
+              ${input("name", "Nome do evento", item?.name, true)}
+              ${input("date", "Data do evento", item?.date, false, "date")}
+              ${input("location", "Local", item?.location)}
+              ${textarea("description", "Descricao", item?.description, "full")}
+            </div>
+          </div>
+          <div class="integrated-form-section full">
+            <div class="integrated-section-title"><strong>Carta proposta</strong><span>Modelo usado automaticamente para este evento</span></div>
+            <div class="integrated-section-grid">
+              ${input("templateName", "Nome da carta proposta", linkedTemplate?.name || item?.name || "")}
+              ${input("templateType", "Tipo", linkedTemplate?.type || "Evento externo")}
+              <div class="field full">
+                <label>Importar Word</label>
+                <input type="file" id="docxImport" accept=".docx">
+                <input type="hidden" name="importedFileName" value="${escapeAttr(linkedTemplate?.importedFileName || "")}">
+                <input type="hidden" name="importedFilePath" value="${escapeAttr(linkedTemplate?.importedFilePath || "")}">
+                <input type="hidden" name="storagePath" value="${escapeAttr(linkedTemplate?.storagePath || linkedTemplate?.importedFilePath || "")}">
+              </div>
+              <div class="field full">
+                <label>Variaveis</label>
+                <div class="variables">${variables.map(key => `<button type="button" data-insert-var="{{${key}}}">{{${key}}}</button>`).join("")}</div>
+              </div>
+              ${textarea("templateContent", "Conteudo", templateContent, "full editor")}
+            </div>
+          </div>
+          ${formActions()}
+        </form>
+      `;
+    },
+    serialize: form => Object.fromEntries(form),
+    table: rows => simpleTable(rows, ["Nome", "Data", "Local", "Empresa"], row => [row.name, fmtDate(row.date), row.location, byId("companies", row.companyId)?.name || ""])
+  };
 }
 
 function companyConfig() {
@@ -2416,9 +2467,7 @@ function renderProposalForm(main, id = null) {
     const counterpartEvent = main.querySelector("#counterpartEvent");
     const selectedEvent = byId("events", event.currentTarget.value);
     const templateSelect = main.querySelector("[name='templateId']");
-    const linkedTemplate = selectedEvent
-      ? state.data.templates.find(template => String(template.name || "").toLowerCase() === `modelo - ${String(selectedEvent.name || "").toLowerCase()}`)
-      : null;
+    const linkedTemplate = selectedEvent ? findTemplateForEvent(selectedEvent) : null;
     if (templateSelect && linkedTemplate && !templateSelect.value) templateSelect.value = linkedTemplate.id;
     if (counterpartEvent && event.currentTarget.value) {
       counterpartEvent.value = event.currentTarget.value;
