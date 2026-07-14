@@ -686,30 +686,29 @@ function dashboardRecentList(items) {
 function proposalFilters() {
   const companies = state.data.companies;
   const events = state.data.events;
-  const users = state.data.users;
   return `
-    <section class="panel">
-      <div class="filter-grid">
-        <label class="field"><span>Busca</span><input id="filterSearch" placeholder="Código, empresa, evento ou título"></label>
+    <section class="panel proposal-filter-panel">
+      <div class="proposal-filter-grid">
+        <label class="field proposal-search-field"><span>Busca</span><input id="filterSearch" placeholder="Codigo, empresa, evento ou titulo"></label>
         <label class="field"><span>Empresa</span><select id="filterCompany"><option value="">Todas</option>${options(companies)}</select></label>
         <label class="field"><span>Evento</span><select id="filterEvent"><option value="">Todos</option>${options(events)}</select></label>
-        <label class="field"><span>Status</span><select id="filterStatus"><option value="">Todos</option>${proposalStatuses.map(status => `<option>${status}</option>`).join("")}</select></label>
-        <label class="field"><span>Responsável</span><select id="filterOwner"><option value="">Todos</option>${options(users)}</select></label>
+        <label class="field"><span>Etapa</span><select id="filterStage"><option value="">Todas</option>${workflowStages.map(stage => `<option value="${escapeAttr(stage)}">${escapeHtml(workflowLabels[stage] || stage)}</option>`).join("")}</select></label>
       </div>
     </section>
   `;
 }
-
 function bindProposalFilters(main) {
-  ["filterSearch", "filterCompany", "filterEvent", "filterStatus", "filterOwner"].forEach(id => {
+  ["filterSearch", "filterCompany", "filterEvent", "filterStage"].forEach(id => {
     const input = main.querySelector(`#${id}`);
-    if (input) input.addEventListener("input", () => {
+    const apply = () => {
       const wrap = main.querySelector("#proposalTableWrap");
       const filtered = filterProposals(enrichedProposals());
       wrap.outerHTML = proposalTable(filtered);
       updateProposalReportTools(main, filtered);
       bindProposalActions(main);
-    });
+    };
+    input?.addEventListener("input", apply);
+    input?.addEventListener("change", apply);
   });
 }
 
@@ -751,12 +750,10 @@ function activeProposalFilters() {
     ["Busca", document.getElementById("filterSearch")?.value],
     ["Empresa", document.getElementById("filterCompany")?.selectedOptions?.[0]?.text],
     ["Evento", document.getElementById("filterEvent")?.selectedOptions?.[0]?.text],
-    ["Status", document.getElementById("filterStatus")?.value],
-    ["Responsável", document.getElementById("filterOwner")?.selectedOptions?.[0]?.text]
+    ["Etapa", document.getElementById("filterStage")?.selectedOptions?.[0]?.text]
   ];
   return values.filter(([, value]) => value && !["Todas", "Todos"].includes(value));
 }
-
 function csvCell(value) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -887,19 +884,16 @@ function filterProposals(items) {
   const search = document.getElementById("filterSearch")?.value.toLowerCase() || "";
   const company = document.getElementById("filterCompany")?.value || "";
   const event = document.getElementById("filterEvent")?.value || "";
-  const status = document.getElementById("filterStatus")?.value || "";
-  const owner = document.getElementById("filterOwner")?.value || "";
+  const stage = document.getElementById("filterStage")?.value || "";
 
   return items.filter(item => {
     const haystack = `${item.controlCode} ${item.title} ${item.companyName} ${item.eventName}`.toLowerCase();
     return (!search || haystack.includes(search))
       && (!company || item.companyId === company)
       && (!event || item.eventId === event)
-      && (!status || item.status === status)
-      && (!owner || item.ownerId === owner);
+      && (!stage || item.workflowStage === stage);
   });
 }
-
 function noteAgeInDays(createdAt) {
   if (!createdAt) return null;
   const created = new Date(createdAt);
@@ -1450,44 +1444,78 @@ function bindHistoryFilters(scope) {
   applyFilters();
 }
 
+function proposalActionIcon(name) {
+  const icons = {
+    pencil: `<path d="M21.2 6.8a2.4 2.4 0 0 0-4-4L4 16v4h4z"/><path d="m14.5 5.5 4 4"/>`,
+    download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>`,
+    copy: `<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>`,
+    trash: `<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>`,
+    history: `<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/>`
+  };
+  return `<svg class="proposal-action-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.pencil}</svg>`;
+}
+
+function workflowBadgeClass(stage) {
+  const classes = {
+    "Em confeccao": "drafting",
+    "Proposta enviada": "sent",
+    "Em formalizacao": "formalizing",
+    "Em realizacao": "running",
+    "Finalizado": "done",
+    "Declinios": "declined"
+  };
+  return classes[stage] || "drafting";
+}
+
 function proposalTable(items) {
-  if (!items.length) return `<div id="proposalTableWrap" class="table-wrap"><div class="empty">Nenhuma proposta encontrada.</div></div>`;
+  if (!items.length) return `<div id="proposalTableWrap" class="proposal-card-list"><div class="empty">Nenhuma proposta encontrada.</div></div>`;
   return `
-    <div id="proposalTableWrap" class="table-wrap">
-      <table>
-        <thead><tr><th>Código</th><th>Título</th><th>Empresa</th><th>Evento</th><th>Status</th><th>Etapa</th><th>Responsável</th><th>Atualização</th><th></th></tr></thead>
-        <tbody>
-          ${items.map(item => `
-            <tr>
-              <td><strong>${escapeHtml(item.controlCode || "Pendente")}</strong></td>
-              <td><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${escapeHtml(money(item.value) || item.value || "Sem valor")}</span></td>
-              <td>${escapeHtml(item.companyName)}</td>
-              <td>${escapeHtml(item.eventName)}</td>
-              <td><span class="badge ${item.status === "Final" ? "final" : "draft"}">${item.status}</span></td>
-              <td><span class="badge workflow">${escapeHtml(workflowLabels[item.workflowStage] || item.workflowStage)}</span></td>
-              <td>${escapeHtml(item.ownerName)}</td>
-              <td>${fmtDate(item.updatedAt?.slice(0, 10))}</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn" data-edit-proposal="${item.id}">Editar</button>
-                  <button class="btn primary" data-docx="${item.id}" ${!canWrite() ? "disabled" : ""}>Word</button>
-                  <button class="btn danger" data-delete-proposal="${item.id}" ${!canWrite() ? "disabled" : ""}>Excluir</button>
-                </div>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
+    <div id="proposalTableWrap" class="proposal-card-list">
+      ${items.map(item => {
+        const changes = (state.data.proposalChangeLogs || []).filter(log => log.proposalId === item.id).length;
+        const versions = (state.data.proposalVersions || []).filter(version => version.proposalId === item.id).length;
+        const historyCount = changes + versions;
+        const historyLabel = historyCount ? `${historyCount} ${historyCount === 1 ? "alteracao" : "alteracoes"}` : "Ver historico";
+        const stageLabel = workflowLabels[item.workflowStage] || item.workflowStage;
+        return `
+          <article class="proposal-list-card">
+            <div class="proposal-card-id">
+              <strong>${escapeHtml(item.controlCode || "Pendente")}</strong>
+              <h3>${escapeHtml(item.title || "Proposta sem titulo")}</h3>
+              <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
+            </div>
+            <div class="proposal-card-context">
+              <span>${escapeHtml(item.companyName || "Sem empresa")}</span>
+              <span>${escapeHtml(item.eventName || "Sem evento")}</span>
+              <i class="proposal-stage-badge ${workflowBadgeClass(item.workflowStage)}">${escapeHtml(stageLabel)}</i>
+            </div>
+            <div class="proposal-card-actions">
+              <button class="proposal-history-link" type="button" data-route-history="${escapeAttr(item.id)}">${proposalActionIcon("history")}<span>${escapeHtml(historyLabel)}</span></button>
+              <div class="proposal-icon-actions">
+                <button class="proposal-icon-btn" type="button" data-edit-proposal="${escapeAttr(item.id)}" aria-label="Editar proposta">${proposalActionIcon("pencil")}</button>
+                <button class="proposal-icon-btn download" type="button" data-docx="${escapeAttr(item.id)}" aria-label="Baixar Word" ${!canWrite() ? "disabled" : ""}>${proposalActionIcon("download")}</button>
+                <button class="proposal-icon-btn" type="button" data-duplicate-proposal="${escapeAttr(item.id)}" aria-label="Duplicar proposta" ${!canWrite() ? "disabled" : ""}>${proposalActionIcon("copy")}</button>
+                <button class="proposal-icon-btn delete" type="button" data-delete-proposal="${escapeAttr(item.id)}" aria-label="Excluir proposta" ${!canWrite() ? "disabled" : ""}>${proposalActionIcon("trash")}</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("")}
     </div>
   `;
 }
-
 function bindProposalActions(scope = document) {
   scope.querySelectorAll("[data-edit-proposal]").forEach(button => {
     button.addEventListener("click", () => navigate(`/propostas/${button.dataset.editProposal}/editar`));
   });
+  scope.querySelectorAll("[data-route-history]").forEach(button => {
+    button.addEventListener("click", () => navigate("/historico"));
+  });
   scope.querySelectorAll("[data-docx]").forEach(button => {
     button.addEventListener("click", () => downloadDocx(button.dataset.docx));
+  });
+  scope.querySelectorAll("[data-duplicate-proposal]").forEach(button => {
+    button.addEventListener("click", () => duplicateProposal(button.dataset.duplicateProposal));
   });
   scope.querySelectorAll("[data-delete-proposal]").forEach(button => {
     button.addEventListener("click", async () => {
@@ -1503,6 +1531,35 @@ function bindProposalActions(scope = document) {
       }
     });
   });
+}
+
+async function duplicateProposal(id) {
+  const proposal = byId("proposals", id);
+  if (!proposal) return;
+  try {
+    const payload = {
+      title: `${proposal.title || "Proposta"} - cópia`,
+      companyId: proposal.companyId,
+      eventId: proposal.eventId,
+      templateId: proposal.templateId,
+      ownerId: proposal.ownerId || state.user?.id || "",
+      recipientName: proposal.recipientName,
+      value: proposal.value,
+      status: "Rascunho",
+      workflowStage: "Em confeccao",
+      content: proposal.content,
+      counterpartIds: Array.isArray(proposal.counterpartIds) ? proposal.counterpartIds : []
+    };
+    const saved = await api("/api/proposals", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    toast("Proposta duplicada como rascunho.");
+    await reload();
+    navigate(`/propostas/${saved.id}/editar`, true);
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function downloadDocx(id) {
