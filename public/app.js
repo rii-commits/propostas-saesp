@@ -2124,9 +2124,6 @@ function eventConfig() {
           <div class="integrated-section-title"><strong>Evento</strong><span>Dados principais usados nas propostas</span></div>
           <div class="integrated-section-grid">
             ${input("name", "Nome do evento", item?.name, true)}
-            ${input("date", "Data do evento", item?.date, false, "date")}
-            ${input("location", "Local", item?.location)}
-            ${textarea("description", "Descrição", item?.description, "full")}
           </div>
         </div>
         ${!item ? `
