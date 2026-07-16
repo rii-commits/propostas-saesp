@@ -881,19 +881,27 @@ function printProposalReport() {
   reportWindow.document.close();
 }
 
+function proposalRecencyValue(item) {
+  return String(item.createdAt || item.issuedAt || item.updatedAt || "");
+}
+
+function sortProposalsNewestFirst(items) {
+  return [...items].sort((a, b) => proposalRecencyValue(b).localeCompare(proposalRecencyValue(a)));
+}
+
 function filterProposals(items) {
   const search = document.getElementById("filterSearch")?.value.toLowerCase() || "";
   const company = document.getElementById("filterCompany")?.value || "";
   const event = document.getElementById("filterEvent")?.value || "";
   const stage = document.getElementById("filterStage")?.value || "";
 
-  return items.filter(item => {
+  return sortProposalsNewestFirst(items.filter(item => {
     const haystack = `${item.controlCode} ${item.title} ${item.companyName} ${item.eventName}`.toLowerCase();
     return (!search || haystack.includes(search))
       && (!company || item.companyId === company)
       && (!event || item.eventId === event)
       && (!stage || item.workflowStage === stage);
-  });
+  }));
 }
 function noteAgeInDays(createdAt) {
   if (!createdAt) return null;
