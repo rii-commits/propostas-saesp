@@ -1949,9 +1949,260 @@ tbody tr:nth-child(even) td {
   color: #8a5a00;
 }
 
+.badge.sent {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.badge.refused {
+  background: #fee4e2;
+  color: #b42318;
+}
+
 .badge.workflow {
   background: rgba(120, 194, 200, 0.22);
   color: var(--brand);
+}
+
+.history-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: -6px 0 18px;
+  padding: 4px;
+  border: 1px solid #d9e1ea;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.history-tabs button {
+  min-height: 36px;
+  border-radius: 9px;
+  padding: 8px 14px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+  background: transparent;
+}
+
+.history-tabs button.active {
+  background: #fff;
+  color: var(--brand);
+  box-shadow: 0 1px 2px rgba(20, 27, 38, 0.08);
+}
+
+.compact-filter-panel {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.compact-filter-panel input,
+.compact-filter-panel select {
+  min-height: 42px;
+  border-radius: 12px;
+  border-color: #d9e1ea;
+}
+
+.control-table-wrap {
+  border-radius: 12px;
+  border-color: #e6ebf1;
+  box-shadow: 0 1px 2px rgba(20, 27, 38, 0.03);
+}
+
+.control-table {
+  border-collapse: collapse;
+  min-width: 940px;
+}
+
+.control-table th,
+.control-table td {
+  border-right: 0;
+  border-bottom: 1px solid #edf1f5;
+  padding: 16px 18px;
+  vertical-align: middle;
+}
+
+.control-table th {
+  background: #f8fafc;
+  color: #667085;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.control-table td {
+  font-size: 14px;
+  color: #172033;
+}
+
+.control-table tbody tr:nth-child(even) td {
+  background: #fff;
+}
+
+.control-table tbody tr:hover td {
+  background: #fbfdff;
+}
+
+.control-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.history-active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #d9e1ea;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-active-filter button {
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.activity-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.timeline-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 40px;
+  bottom: -12px;
+  width: 1px;
+  background: #e6ebf1;
+}
+
+.timeline-marker {
+  position: relative;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c05621;
+  border: 1px solid #fed7aa;
+}
+
+.timeline-marker.create {
+  background: #ecfdf3;
+  color: #157347;
+  border-color: #b7e4c7;
+}
+
+.timeline-marker.delete {
+  background: #fff1f0;
+  color: #b42318;
+  border-color: #fecdca;
+}
+
+.timeline-icon-svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.timeline-content {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e6ebf1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 27, 38, 0.03);
+}
+
+.timeline-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.timeline-header strong {
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.timeline-header time {
+  flex: 0 0 auto;
+  color: #98a2b3;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.timeline-meta {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.timeline-changes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.history-change-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.history-change-tag.label {
+  background: #eef3f8;
+  color: var(--brand);
+}
+
+.history-change-tag.before {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.history-change-tag.after {
+  background: #ecfdf3;
+  color: #157347;
+}
+
+.history-change-arrow {
+  color: #98a2b3;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .kanban-board {

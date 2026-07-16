@@ -3,7 +3,9 @@ const state = {
   data: null,
   route: location.pathname,
   toastTimer: null,
-  sidebarExpanded: false
+  sidebarExpanded: false,
+  historyTab: "control",
+  historyProposalFilter: ""
 };
 
 const routes = [
@@ -13,7 +15,6 @@ const routes = [
   { path: "/eventos", label: "Eventos e modelos", icon: "◇" },
   { path: "/contrapartidas", label: "Contrapartidas", icon: "+" },
   { path: "/propostas", label: "Propostas", icon: "✎" },
-  { path: "/controle", label: "Controle", icon: "#" },
   { path: "/historico", label: "Histórico", icon: "◷" },
   { path: "/usuarios", label: "Usuarios", icon: "@" }
 ];
@@ -412,7 +413,7 @@ function renderApp() {
   else if (active === "/propostas/nova") renderProposalForm(main);
   else if (active.startsWith("/propostas/") && active.endsWith("/editar")) renderProposalForm(main, active.split("/")[2]);
   else if (active === "/propostas") renderProposals(main);
-  else if (active === "/controle") renderControl(main);
+  else if (active === "/controle") renderHistory(main, "control");
   else if (active === "/historico") renderHistory(main);
   else if (active === "/usuarios" && canAdmin()) renderCrud(main, userConfig());
   else renderDashboard(main);
@@ -1269,8 +1270,8 @@ function renderControl(main) {
 function controlTable(proposals) {
   if (!proposals.length) return `<div class="empty">Nenhuma proposta cadastrada.</div>`;
   return `
-    <table>
-      <thead><tr><th>Código</th><th>Data de emissão</th><th>Responsável</th><th>Empresa</th><th>Valor</th><th>Status</th><th>Histórico</th><th></th></tr></thead>
+    <table class="control-table">
+      <thead><tr><th>Código</th><th>Data de emissão</th><th>Responsável</th><th>Empresa</th><th>Valor</th><th>Status</th><th>Histórico</th><th>Ações</th></tr></thead>
       <tbody>
         ${proposals.map(item => {
           const changes = (state.data.proposalChangeLogs || []).filter(log => log.proposalId === item.id).length;
@@ -1283,9 +1284,14 @@ function controlTable(proposals) {
               <td>${escapeHtml(item.ownerName)}</td>
               <td>${escapeHtml(item.companyName)}</td>
               <td>${escapeHtml(money(item.value) || item.value || "Sem valor")}</td>
-              <td><span class="badge ${item.status === "Final" || item.status === "Aprovada" ? "final" : "draft"}">${escapeHtml(item.status)}</span></td>
+              <td><span class="badge ${statusBadgeClass(item.status)}">${escapeHtml(item.status)}</span></td>
               <td>${changes} alterações<br><span class="muted">${versions} versões</span></td>
-              <td><div class="row-actions"><button class="btn" data-edit-proposal="${item.id}">Editar</button><button class="btn" data-route-history="${item.id}">Histórico</button></div></td>
+              <td>
+                <div class="control-actions">
+                  <button class="proposal-icon-btn" type="button" data-edit-proposal="${escapeAttr(item.id)}" aria-label="Editar proposta">${proposalActionIcon("pencil")}</button>
+                  <button class="proposal-icon-btn" type="button" data-route-history="${escapeAttr(item.id)}" aria-label="Ver historico da proposta">${proposalActionIcon("history")}</button>
+                </div>
+              </td>
             </tr>
           `;
         }).join("")}
@@ -1296,9 +1302,6 @@ function controlTable(proposals) {
 
 function bindControlFilters(scope) {
   bindProposalActions(scope);
-  scope.querySelectorAll("[data-route-history]").forEach(button => {
-    button.addEventListener("click", () => navigate("/historico"));
-  });
 
   const searchInput = scope.querySelector("#controlSearch");
   const yearSelect = scope.querySelector("#controlYear");
@@ -1331,21 +1334,66 @@ function bindControlFilters(scope) {
   applyFilters();
 }
 
-function renderHistory(main) {
-  const logs = historyEntries();
-  main.innerHTML = `
-    ${pageHeader("Histórico", "Registro de versões, alterações de valores, contrapartidas e exclusões de propostas.")}
-    <section class="panel">
-      <div class="filter-grid history-filter-grid">
-        <label class="field"><span>Buscar</span><input id="historySearch" placeholder="Proposta, empresa, evento, usuário ou alteração"></label>
-        <label class="field"><span>Evento</span><select id="historyEvent"><option value="">Todos</option>${options(state.data.events)}</select></label>
-        <label class="field"><span>Usuário</span><select id="historyUser"><option value="">Todos</option>${options(state.data.users)}</select></label>
-        <div class="counterpart-count" id="historyCount"></div>
-      </div>
-    </section>
-    <div class="table-wrap">${historyTable(logs)}</div>
+function renderHistoryTabs(activeTab = state.historyTab || "control") {
+  return `
+    <div class="history-tabs" role="tablist" aria-label="Navegacao do historico">
+      <button class="${activeTab === "control" ? "active" : ""}" type="button" data-history-tab="control" role="tab" aria-selected="${activeTab === "control"}">Controle de Propostas</button>
+      <button class="${activeTab === "activities" ? "active" : ""}" type="button" data-history-tab="activities" role="tab" aria-selected="${activeTab === "activities"}">Registro de Atividades</button>
+    </div>
   `;
+}
+
+function renderHistory(main, initialTab) {
+  state.historyTab = initialTab || state.historyTab || "control";
+  const logs = historyEntries();
+  const proposals = enrichedProposals().sort((a, b) => String(b.issuedAt || b.createdAt || "").localeCompare(String(a.issuedAt || a.createdAt || "")));
+  const years = Array.from(new Set(proposals.map(item => item.controlYear).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const selectedProposal = state.historyProposalFilter ? proposals.find(item => item.id === state.historyProposalFilter) : null;
+  main.innerHTML = `
+    ${pageHeader("Histórico", "Controle de propostas e registro completo de atividades em uma unica tela.")}
+    ${renderHistoryTabs(state.historyTab)}
+    <div class="history-tab-panel ${state.historyTab === "control" ? "" : "hidden"}" data-history-panel="control">
+      <section class="panel compact-filter-panel">
+        <div class="filter-grid control-filter-grid">
+          <label class="field"><span>Buscar</span><input id="controlSearch" placeholder="Codigo, empresa, proposta ou responsavel"></label>
+          <label class="field"><span>Ano</span><select id="controlYear"><option value="">Todos</option>${years.map(year => `<option>${escapeHtml(year)}</option>`).join("")}</select></label>
+          <label class="field"><span>Empresa</span><select id="controlCompany"><option value="">Todas</option>${options(state.data.companies)}</select></label>
+          <label class="field"><span>Status</span><select id="controlStatus"><option value="">Todos</option>${proposalStatuses.map(status => `<option>${status}</option>`).join("")}</select></label>
+          <div class="counterpart-count" id="controlCount"></div>
+        </div>
+      </section>
+      <div class="table-wrap control-table-wrap">${controlTable(proposals)}</div>
+    </div>
+    <div class="history-tab-panel ${state.historyTab === "activities" ? "" : "hidden"}" data-history-panel="activities">
+      <section class="panel compact-filter-panel">
+        <div class="filter-grid history-filter-grid">
+          <label class="field"><span>Buscar</span><input id="historySearch" placeholder="Proposta, empresa, evento, usuario ou alteracao" value="${escapeAttr(selectedProposal ? `${selectedProposal.controlCode || ""} ${selectedProposal.title || ""}`.trim() : "")}"></label>
+          <label class="field"><span>Evento</span><select id="historyEvent"><option value="">Todos</option>${options(state.data.events)}</select></label>
+          <label class="field"><span>Usuário</span><select id="historyUser"><option value="">Todos</option>${options(state.data.users)}</select></label>
+          <div class="counterpart-count" id="historyCount"></div>
+        </div>
+      </section>
+      ${selectedProposal ? `<div class="history-active-filter"><span>Filtro aplicado: ${escapeHtml(selectedProposal.controlCode || "Sem codigo")} - ${escapeHtml(selectedProposal.title || "Proposta sem titulo")}</span><button type="button" data-clear-history-proposal>Limpar</button></div>` : ""}
+      ${historyTimeline(logs)}
+    </div>
+  `;
+  bindHistoryTabs(main);
+  bindControlFilters(main);
   bindHistoryFilters(main);
+}
+
+function bindHistoryTabs(scope) {
+  scope.querySelectorAll("[data-history-tab]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.historyTab = button.dataset.historyTab;
+      if (state.historyTab === "control") state.historyProposalFilter = "";
+      renderHistory(scope);
+    });
+  });
+  scope.querySelector("[data-clear-history-proposal]")?.addEventListener("click", () => {
+    state.historyProposalFilter = "";
+    renderHistory(scope, "activities");
+  });
 }
 
 function historyEntries() {
@@ -1380,6 +1428,74 @@ function displayHistoryText(value) {
   return String(value || "")
     .replaceAll("Exportacao", "Exportação")
     .replaceAll("Criacao", "Criação");
+}
+
+function statusBadgeClass(status) {
+  const classes = {
+    "Enviada": "sent",
+    "Final": "final",
+    "Aprovada": "final",
+    "Recusada": "refused",
+    "Cancelada": "refused",
+    "Rascunho": "draft"
+  };
+  return classes[status] || "draft";
+}
+
+function historyActionKind(log) {
+  const text = `${log.action || ""} ${(log.changes || []).map(change => change.label).join(" ")}`.toLowerCase();
+  if (text.includes("exclu")) return "delete";
+  if (text.includes("cria")) return "create";
+  return "edit";
+}
+
+function historyActionIcon(kind) {
+  const icons = {
+    create: `<path d="M12 5v14"/><path d="M5 12h14"/>`,
+    edit: `<path d="M21.2 6.8a2.4 2.4 0 0 0-4-4L4 16v4h4z"/><path d="m14.5 5.5 4 4"/>`,
+    delete: `<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>`
+  };
+  return `<svg class="timeline-icon-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[kind] || icons.edit}</svg>`;
+}
+
+function historySentence(log) {
+  const user = log.changedByName || "Sistema";
+  const action = displayHistoryText(log.action || "atualizou");
+  const proposal = log.proposalTitle || "Proposta removida";
+  const code = log.controlCode ? ` (${log.controlCode})` : "";
+  const company = log.companyName || "Sem empresa";
+  return `${user} ${action.toLowerCase()} a proposta ${proposal}${code} da empresa ${company}`;
+}
+
+function historyTimeline(logs) {
+  if (!logs.length) return `<div class="empty">Nenhuma alteração registrada ainda.</div>`;
+  return `
+    <div class="activity-timeline">
+      ${logs.map(log => {
+        const changesText = (log.changes || []).map(change => `${change.label}: ${change.from || "-"} -> ${change.to || "-"}`).join(" | ");
+        const searchText = `${log.controlCode || ""} ${log.proposalTitle} ${log.companyName} ${log.eventName} ${log.changedByName} ${log.action} ${changesText}`.toLowerCase();
+        const kind = historyActionKind(log);
+        return `
+          <article class="timeline-item" data-history-row data-event-id="${escapeAttr(log.eventId || "")}" data-user-id="${escapeAttr(log.changedById || "")}" data-search="${escapeAttr(searchText)}">
+            <div class="timeline-marker ${kind}">${historyActionIcon(kind)}</div>
+            <div class="timeline-content">
+              <div class="timeline-header">
+                <strong>${escapeHtml(historySentence(log))}</strong>
+                <time>${escapeHtml(fmtDateTime(log.createdAt))}</time>
+              </div>
+              <div class="timeline-meta">${escapeHtml(log.eventName || "Sem evento")}</div>
+              <div class="timeline-changes">${(log.changes || []).map(change => `
+                <span class="history-change-tag label">${escapeHtml(change.label)}</span>
+                <span class="history-change-tag before">Antes: ${escapeHtml(change.from || "-")}</span>
+                <span class="history-change-arrow">-></span>
+                <span class="history-change-tag after">Depois: ${escapeHtml(change.to || "-")}</span>
+              `).join("")}</div>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function historyTable(logs) {
@@ -1509,7 +1625,11 @@ function bindProposalActions(scope = document) {
     button.addEventListener("click", () => navigate(`/propostas/${button.dataset.editProposal}/editar`));
   });
   scope.querySelectorAll("[data-route-history]").forEach(button => {
-    button.addEventListener("click", () => navigate("/historico"));
+    button.addEventListener("click", () => {
+      state.historyTab = "activities";
+      state.historyProposalFilter = button.dataset.routeHistory || "";
+      navigate("/historico");
+    });
   });
   scope.querySelectorAll("[data-docx]").forEach(button => {
     button.addEventListener("click", () => downloadDocx(button.dataset.docx));
