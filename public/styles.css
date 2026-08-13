@@ -1002,6 +1002,23 @@ textarea:disabled {
   flex: 0 0 min(360px, 30%);
 }
 
+.model-upload-field {
+  min-width: 210px;
+  flex: 0 1 240px;
+}
+
+.model-upload-field input[type="file"] {
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.model-upload-field small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
 .model-variable-strip {
   min-width: 260px;
   flex: 1 1 auto;
@@ -2762,6 +2779,10 @@ tbody tr:nth-child(even) td {
 
   .model-event-name {
     width: 100%;
+    flex-basis: auto;
+  }
+
+  .model-upload-field {
     flex-basis: auto;
   }
 

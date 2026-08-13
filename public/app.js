@@ -2280,6 +2280,11 @@ function integratedEventConfig() {
             <input type="hidden" name="importedFileName" value="${escapeAttr(linkedTemplate?.importedFileName || "")}">
             <input type="hidden" name="importedFilePath" value="${escapeAttr(linkedTemplate?.importedFilePath || "")}">
             <input type="hidden" name="storagePath" value="${escapeAttr(linkedTemplate?.storagePath || linkedTemplate?.importedFilePath || "")}">
+            <label class="field model-upload-field">
+              <span>Subir proposta</span>
+              <input type="file" id="docxImport" accept=".docx" ${!canWrite() ? "disabled" : ""}>
+              ${linkedTemplate?.importedFileName ? `<small>${escapeHtml(linkedTemplate.importedFileName)}</small>` : ""}
+            </label>
             <div class="model-variable-strip" aria-label="Variáveis úteis">
               <span>Variáveis úteis</span>
               <div>
@@ -2920,7 +2925,8 @@ function bindImportButtons(scope) {
         method: "POST",
         body: JSON.stringify({ fileName: file.name, base64 })
       });
-      scope.querySelector("[name='content']").value = imported.content;
+      const contentInput = scope.querySelector("[name='content'], [name='templateContent']");
+      if (contentInput) contentInput.value = imported.content;
       scope.querySelector("[name='importedFileName']").value = imported.fileName;
       scope.querySelector("[name='importedFilePath']").value = imported.storedPath;
       scope.querySelector("[name='storagePath']").value = imported.storagePath || imported.storedPath;
