@@ -75,6 +75,8 @@ const fieldMaps = {
       title: "title",
       companyId: "company_id",
       eventId: "event_id",
+      eventDate: "event_date",
+      eventLocation: "event_location",
       templateId: "template_id",
       ownerId: "owner_id",
       recipientName: "recipient_name",

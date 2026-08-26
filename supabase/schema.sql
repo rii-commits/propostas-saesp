@@ -79,6 +79,8 @@ create table if not exists public.proposals (
   title text not null default '',
   company_id uuid references public.companies(id) on delete set null,
   event_id uuid references public.events(id) on delete set null,
+  event_date text not null default '',
+  event_location text not null default '',
   template_id uuid references public.templates(id) on delete set null,
   owner_id uuid references public.profiles(id) on delete set null,
   recipient_name text not null default '',

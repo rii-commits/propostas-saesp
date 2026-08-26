@@ -93,6 +93,8 @@ function sanitizeEntity(resource, body) {
     base.title = normalizeText(base.title);
     base.companyId = base.companyId || null;
     base.eventId = base.eventId || null;
+    base.eventDate = normalizeText(base.eventDate);
+    base.eventLocation = normalizeText(base.eventLocation);
     base.templateId = base.templateId || null;
     base.ownerId = base.ownerId || null;
     base.recipientName = normalizeText(base.recipientName);
@@ -138,7 +140,7 @@ function formatControlCode(sequence, year) {
 
 function proposalYear(db, payload) {
   const event = db.events.find(item => item.id === payload.eventId);
-  const eventYear = String(event?.date || "").match(/\b(20\d{2})\b/)?.[1] || "";
+  const eventYear = String(payload.eventDate || event?.date || "").match(/\b(20\d{2})\b/)?.[1] || "";
   return /^\d{4}$/.test(eventYear) ? eventYear : String(new Date().getFullYear());
 }
 
@@ -159,8 +161,8 @@ function buildProposalReplacements(db, payload) {
     endereco: company?.address || "",
     evento: event?.name || "",
     data: formatLongDate(payload.issuedAt || payload.createdAt || new Date()),
-    data_evento: formatEventDate(event?.date),
-    local: event?.location || "",
+    data_evento: formatEventDate(payload.eventDate || event?.date),
+    local: payload.eventLocation || event?.location || "",
     valor: payload.value || "",
     responsavel: recipientName,
     responsavel_interno: owner?.name || "",

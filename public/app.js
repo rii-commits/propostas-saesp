@@ -943,8 +943,8 @@ function enrichedProposals() {
         && !["Finalizado", "Declinios"].includes(workflowStage),
       companyName: byId("companies", item.companyId)?.name || "Sem empresa",
       eventName: linkedEvent?.name || "Sem evento",
-      eventDate: linkedEvent?.date || "",
-      eventLocation: linkedEvent?.location || "",
+      eventDate: item.eventDate || "",
+      eventLocation: item.eventLocation || "",
       ownerName: byId("users", item.ownerId)?.name || "Sem responsável"
     };
   });
@@ -1174,19 +1174,16 @@ function openKanbanPlanner(proposalId) {
   const infoForm = overlay.querySelector(".planner-info-form");
   infoForm?.addEventListener("submit", async event => {
     event.preventDefault();
-    const linkedEvent = byId("events", proposal.eventId);
-    if (!linkedEvent) {
-      toast("Evento vinculado não encontrado.");
-      return;
-    }
+    const current = byId("proposals", proposalId);
+    if (!current) return;
     const form = new FormData(event.currentTarget);
     try {
-      await api(`/api/events/${linkedEvent.id}`, {
+      await api(`/api/proposals/${proposalId}`, {
         method: "PUT",
         body: JSON.stringify({
-          ...linkedEvent,
-          date: form.get("eventDate"),
-          location: form.get("eventLocation")
+          ...current,
+          eventDate: form.get("eventDate"),
+          eventLocation: form.get("eventLocation")
         })
       });
       toast("Data e local atualizados.");
@@ -2921,8 +2918,8 @@ function localFillTemplate(payload) {
     endereco: company?.address || "",
     evento: event?.name || "",
     data: fmtLongDate(),
-    data_evento: eventDateLabel(event?.date),
-    local: event?.location || "",
+    data_evento: eventDateLabel(payload.eventDate || event?.date),
+    local: payload.eventLocation || event?.location || "",
     valor: payload.value || "",
     responsavel: recipientName,
     responsavel_interno: owner?.name || "",
