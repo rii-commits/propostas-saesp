@@ -1,10 +1,29 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const handleApi = require("../src/handler");
 
 const PORT = Number(process.env.PORT || 4173);
+const ROOT_DIR = path.join(__dirname, "..");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
+
+function loadLocalEnv() {
+  const envPath = path.join(ROOT_DIR, ".env.local");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator === -1) continue;
+    const name = trimmed.slice(0, separator).trim();
+    const value = trimmed.slice(separator + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
+    if (name && process.env[name] === undefined) process.env[name] = value;
+  }
+}
+
+loadLocalEnv();
+
+const handleApi = require("../src/handler");
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -36,7 +55,13 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.url.startsWith("/api/")) {
-    handleApi(req, res);
+    Promise.resolve(handleApi(req, res)).catch(error => {
+      console.error(error);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      }
+      res.end(JSON.stringify({ error: error.message || "Erro interno." }));
+    });
   } else {
     serveStatic(req, res);
   }

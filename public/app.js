@@ -920,6 +920,7 @@ function enrichedProposals() {
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     const followUpDays = noteAgeInDays(notes[0]?.createdAt);
     const workflowStage = workflowStages.includes(item.workflowStage) ? item.workflowStage : "Em confeccao";
+    const linkedEvent = byId("events", item.eventId);
     return {
       ...item,
       workflowStage,
@@ -932,7 +933,9 @@ function enrichedProposals() {
         && followUpDays >= 5
         && !["Finalizado", "Declinios"].includes(workflowStage),
       companyName: byId("companies", item.companyId)?.name || "Sem empresa",
-      eventName: byId("events", item.eventId)?.name || "Sem evento",
+      eventName: linkedEvent?.name || "Sem evento",
+      eventDate: linkedEvent?.date || "",
+      eventLocation: linkedEvent?.location || "",
       ownerName: byId("users", item.ownerId)?.name || "Sem responsável"
     };
   });
@@ -971,7 +974,10 @@ function kanbanCard(item) {
         <strong>${escapeHtml(item.title)}</strong>
       </div>
       <p class="kanban-company">${escapeHtml(item.companyName)}</p>
-      <p class="muted">${escapeHtml(item.eventName)}</p>
+      <div class="kanban-event">
+        <span>${escapeHtml(item.eventName)}</span>
+        <small>${escapeHtml(fmtDate(item.eventDate))}</small>
+      </div>
       <div class="kanban-meta">
         <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
       </div>
@@ -1086,9 +1092,24 @@ function openKanbanPlanner(proposalId) {
     <section class="planner-panel" role="dialog" aria-modal="true" aria-label="Acompanhamento da proposta">
       <div class="planner-header">
         <div>
-          <span class="muted">${escapeHtml(proposal.controlCode || "Sem código")}</span>
-          <h2>${escapeHtml(proposal.title)}</h2>
-          <p>${escapeHtml(proposal.companyName)} · ${escapeHtml(proposal.eventName)}</p>
+          <form class="planner-info-form">
+            <div class="planner-readonly-info">
+              <span class="muted">${escapeHtml(proposal.controlCode || "Sem código")}</span>
+              <h2>${escapeHtml(proposal.title)}</h2>
+              <p>${escapeHtml(proposal.companyName)} · ${escapeHtml(proposal.eventName)}</p>
+            </div>
+            <div class="planner-event-edit-grid">
+              <label>
+                <span>Data</span>
+                <input name="eventDate" type="date" value="${escapeAttr(proposal.eventDate || "")}" ${!canWrite() ? "disabled" : ""}>
+              </label>
+              <label>
+                <span>Local</span>
+                <input name="eventLocation" value="${escapeAttr(proposal.eventLocation || "")}" placeholder="Local do evento" ${!canWrite() ? "disabled" : ""}>
+              </label>
+            </div>
+            ${canWrite() ? `<button class="btn primary planner-info-save" type="submit">Salvar dados</button>` : ""}
+          </form>
         </div>
         <button class="btn" type="button" data-close-planner>Fechar</button>
       </div>
@@ -1141,6 +1162,33 @@ function openKanbanPlanner(proposalId) {
     if (event.target === overlay) close();
   });
   overlay.querySelector("[data-close-planner]").addEventListener("click", close);
+  const infoForm = overlay.querySelector(".planner-info-form");
+  infoForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const linkedEvent = byId("events", proposal.eventId);
+    if (!linkedEvent) {
+      toast("Evento vinculado não encontrado.");
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    try {
+      await api(`/api/events/${linkedEvent.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...linkedEvent,
+          date: form.get("eventDate"),
+          location: form.get("eventLocation")
+        })
+      });
+      toast("Data e local atualizados.");
+      close();
+      await reload();
+      navigate("/kanban", true);
+      openKanbanPlanner(proposalId);
+    } catch (error) {
+      toast(error.message);
+    }
+  });
   const savePlannerStatus = async changes => {
     const current = byId("proposals", proposalId);
     if (!current) return;
