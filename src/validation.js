@@ -126,13 +126,19 @@ function formatLongDate(value = new Date()) {
   return `${String(source.getDate()).padStart(2, "0")} de ${months[source.getMonth()]} de ${source.getFullYear()}`;
 }
 
+function formatEventDate(value) {
+  const text = normalizeText(value);
+  if (!text) return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? formatLongDate(text) : text;
+}
+
 function formatControlCode(sequence, year) {
   return `C ${String(sequence).padStart(3, "0")}/${year}`;
 }
 
 function proposalYear(db, payload) {
   const event = db.events.find(item => item.id === payload.eventId);
-  const eventYear = String(event?.date || "").slice(0, 4);
+  const eventYear = String(event?.date || "").match(/\b(20\d{2})\b/)?.[1] || "";
   return /^\d{4}$/.test(eventYear) ? eventYear : String(new Date().getFullYear());
 }
 
@@ -153,7 +159,7 @@ function buildProposalReplacements(db, payload) {
     endereco: company?.address || "",
     evento: event?.name || "",
     data: formatLongDate(payload.issuedAt || payload.createdAt || new Date()),
-    data_evento: event?.date ? formatLongDate(event.date) : "",
+    data_evento: formatEventDate(event?.date),
     local: event?.location || "",
     valor: payload.value || "",
     responsavel: recipientName,

@@ -71,6 +71,15 @@ function fmtDate(value) {
   return `${day}/${month}/${year}`;
 }
 
+function fmtEventDate(value) {
+  if (!value) return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? fmtDate(value) : String(value);
+}
+
+function eventDateLabel(value) {
+  return fmtEventDate(value) || "Sem data";
+}
+
 function fmtDateTime(value) {
   if (!value) return "Sem data";
   const date = new Date(value);
@@ -976,7 +985,7 @@ function kanbanCard(item) {
       <p class="kanban-company">${escapeHtml(item.companyName)}</p>
       <div class="kanban-event">
         <span>${escapeHtml(item.eventName)}</span>
-        <small>${escapeHtml(fmtDate(item.eventDate))}</small>
+        <small>${escapeHtml(eventDateLabel(item.eventDate))}</small>
       </div>
       <div class="kanban-meta">
         <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
@@ -1100,8 +1109,8 @@ function openKanbanPlanner(proposalId) {
             </div>
             <div class="planner-event-edit-grid">
               <label>
-                <span>Data</span>
-                <input name="eventDate" type="date" value="${escapeAttr(proposal.eventDate || "")}" ${!canWrite() ? "disabled" : ""}>
+                <span>Datas</span>
+                <input name="eventDate" value="${escapeAttr(fmtEventDate(proposal.eventDate))}" placeholder="Ex.: 29 e 30/08/2026" ${!canWrite() ? "disabled" : ""}>
               </label>
               <label>
                 <span>Local</span>
@@ -2912,7 +2921,7 @@ function localFillTemplate(payload) {
     endereco: company?.address || "",
     evento: event?.name || "",
     data: fmtLongDate(),
-    data_evento: fmtDate(event?.date),
+    data_evento: eventDateLabel(event?.date),
     local: event?.location || "",
     valor: payload.value || "",
     responsavel: recipientName,
