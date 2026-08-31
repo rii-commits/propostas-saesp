@@ -5,12 +5,14 @@ const state = {
   toastTimer: null,
   sidebarExpanded: false,
   historyTab: "control",
-  historyProposalFilter: ""
+  historyProposalFilter: "",
+  dashboardScope: "general"
 };
 
 const routes = [
   { path: "/dashboard", label: "Dashboard", icon: "⌂" },
-  { path: "/kanban", label: "Kanban", icon: "▦" },
+  { path: "/kanban", label: "Cursos Externos", icon: "▦" },
+  { path: "/copa", label: "COPA", icon: "◈" },
   { path: "/empresas", label: "Empresas", icon: "□" },
   { path: "/eventos", label: "Eventos e modelos", icon: "◇" },
   { path: "/contrapartidas", label: "Contrapartidas", icon: "+" },
@@ -38,6 +40,38 @@ const workflowLabels = {
   "Finalizado": "Finalizado",
   "Declinios": "Declínios"
 };
+const copaStorageKey = "saesp_copa_sponsors_offline_v1";
+const copaWorkflowStages = ["Em negociacao", "Proposta enviada", "Em formalizacao", "Concluido", "Proposta recusada"];
+const copaWorkflowLabels = {
+  "Em negociacao": "Em negociação",
+  "Proposta enviada": "Proposta enviada",
+  "Em formalizacao": "Em formalização",
+  "Concluido": "Concluído",
+  "Proposta recusada": "Proposta recusada"
+};
+const copaWorkflowAccentColors = {
+  "Em negociacao": "#14427d",
+  "Proposta enviada": "#eb6b3b",
+  "Em formalizacao": "#476b9d",
+  "Concluido": "#157347",
+  "Proposta recusada": "#9ca3af"
+};
+const copaDefaultTemplate = [
+  "À {{patrocinador}}",
+  "",
+  "Prezados,",
+  "",
+  "Apresentamos a proposta de patrocínio para o Congresso do COPA, na modalidade {{cota}}.",
+  "",
+  "Valor proposto: {{valor}}.",
+  "Responsável pelo contato: {{contato}}.",
+  "",
+  "Contrapartidas previstas:",
+  "{{contrapartidas}}",
+  "",
+  "Observações:",
+  "{{observacoes}}"
+].join("\n");
 
 function canWrite() {
   return state.user && ["Admin", "Editor"].includes(state.user.role);
@@ -166,10 +200,42 @@ async function bootstrap() {
     if (location.pathname === "/" || location.pathname === "/login") navigate("/dashboard", true);
     renderApp();
   } catch (error) {
+    if (isLocalOfflineCopa()) {
+      state.user = {
+        id: "local-copa-admin",
+        name: "Teste local Copa",
+        email: "offline@local",
+        role: "Admin"
+      };
+      state.data = emptyBootstrapData(state.user);
+      renderApp();
+      return;
+    }
     state.user = null;
     const showError = error.status !== 401 || (location.pathname !== "/" && location.pathname !== "/login");
     renderLogin(showError ? error.message : "");
   }
+}
+
+function isLocalOfflineCopa() {
+  const host = location.hostname;
+  return normalizeRoute(location.pathname).startsWith("/copa")
+    && (host === "localhost" || host === "127.0.0.1");
+}
+
+function emptyBootstrapData(user) {
+  return {
+    users: [user],
+    companies: [],
+    events: [],
+    templates: [],
+    counterparts: [],
+    proposals: [],
+    proposalVersions: [],
+    proposalChangeLogs: [],
+    proposalNotes: [],
+    currentUser: user
+  };
 }
 
 function recoverySession() {
@@ -382,7 +448,7 @@ function renderApp() {
         </div>
         <nav class="nav">
           ${routes.map(route => `
-            <button class="${active === route.path ? "active" : ""}" data-route="${route.path}" title="${escapeAttr(route.label)}" ${route.path === "/usuarios" && !canAdmin() ? "disabled" : ""}>
+            <button class="${isRouteActive(active, route.path) ? "active" : ""}" data-route="${route.path}" title="${escapeAttr(route.label)}" ${route.path === "/usuarios" && !canAdmin() ? "disabled" : ""}>
               <span class="icon">${routeIcon(route.path)}</span><span class="nav-label">${route.label}</span>
             </button>
           `).join("")}
@@ -415,6 +481,9 @@ function renderApp() {
   const main = document.getElementById("main");
   if (active === "/dashboard") renderDashboardV2(main);
   else if (active === "/kanban") renderKanban(main);
+  else if (active === "/copa/propostas/nova") renderCopaProposalForm(main);
+  else if (active.startsWith("/copa/propostas/") && active.endsWith("/editar")) renderCopaProposalForm(main, active.split("/")[3]);
+  else if (active === "/copa") renderCopa(main);
   else if (active === "/empresas") renderCompanies(main);
   else if (active === "/eventos") renderEvents(main);
   else if (active === "/modelos") renderCrud(main, templateConfig());
@@ -444,6 +513,7 @@ function routeIcon(key) {
     "menu": `<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>`,
     "/dashboard": `<rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/>`,
     "/kanban": `<rect width="5" height="16" x="3" y="4" rx="1.5"/><rect width="5" height="10" x="9.5" y="4" rx="1.5"/><rect width="5" height="14" x="16" y="4" rx="1.5"/>`,
+    "/copa": `<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>`,
     "/empresas": `<path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M4 21h16"/><path d="M9 7h1"/><path d="M14 7h1"/><path d="M9 11h1"/><path d="M14 11h1"/><path d="M9 15h1"/><path d="M14 15h1"/>`,
     "/eventos": `<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/>`,
     "/modelos": `<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>`,
@@ -458,6 +528,10 @@ function routeIcon(key) {
     "search": `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`
   };
   return `<svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[key] || icons["/dashboard"]}</svg>`;
+}
+
+function isRouteActive(active, path) {
+  return active === path || (path === "/copa" && active.startsWith("/copa/"));
 }
 
 function normalizeRoute(route) {
@@ -512,9 +586,15 @@ function renderDashboard(main) {
 }
 
 function renderDashboardV2(main) {
-  const proposals = enrichedProposals();
-  const sentStages = workflowStages.filter(stage => stage !== "Em confeccao");
-  const convertedStages = ["Em formalizacao", "Em realizacao", "Finalizado"];
+  const scopeConfig = dashboardScopeConfig(state.dashboardScope);
+  const isCopaScope = scopeConfig.key === "copa";
+  const proposals = dashboardScopedProposals(scopeConfig.key);
+  const stageSet = scopeConfig.stages;
+  const stageLabels = scopeConfig.labels;
+  const sentStages = isCopaScope
+    ? copaWorkflowStages.filter(stage => stage !== "Em negociacao")
+    : workflowStages.filter(stage => stage !== "Em confeccao");
+  const convertedStages = isCopaScope ? ["Em formalizacao", "Concluido"] : ["Em formalizacao", "Em realizacao", "Finalizado"];
   const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage));
   const convertedItems = proposals.filter(item => convertedStages.includes(item.workflowStage));
   const acceptedItems = proposals.filter(item => ["Aprovada", "Final"].includes(item.status) || convertedStages.includes(item.workflowStage));
@@ -528,6 +608,7 @@ function renderDashboardV2(main) {
 
   main.innerHTML = `
     ${pageHeader("Dashboard", "Indicadores comerciais e conversao das propostas.")}
+    ${dashboardScopeFilter(scopeConfig.key)}
     <section class="dashboard-kpis">
       <div class="dashboard-kpi sent">
         <span>Propostas enviadas</span>
@@ -545,21 +626,21 @@ function renderDashboardV2(main) {
         <small>${convertedItems.length} em formalizacao ou alem</small>
       </div>
       <div class="dashboard-kpi neutral">
-        <span>Base ativa</span>
-        <strong>${state.data.companies.length}</strong>
-        <small>${state.data.events.length} eventos cadastrados</small>
+        <span>${isCopaScope ? "Patrocinadores" : "Base ativa"}</span>
+        <strong>${isCopaScope ? new Set(proposals.map(item => item.companyId || item.sponsorName).filter(Boolean)).size : state.data.companies.length}</strong>
+        <small>${scopeConfig.helper}</small>
       </div>
     </section>
     <section class="dashboard-grid">
       ${dashboardValueChart(sentValue, convertedValue)}
-      ${dashboardStageChart(proposals)}
+      ${dashboardStageChart(proposals, stageSet, stageLabels)}
       ${dashboardStatusChart(proposals)}
-      ${dashboardRecentList(recentItems)}
+      ${dashboardRecentList(recentItems, isCopaScope)}
     </section>
     <section class="dashboard-actions panel">
       <div>
-        <strong>${proposals.length} propostas no total</strong>
-        <span>Use a tela Propostas para filtros detalhados, CSV e relatorios.</span>
+        <strong>${proposals.length} ${scopeConfig.summaryLabel}</strong>
+        <span>${scopeConfig.description}</span>
       </div>
       <div class="report-actions">
         <button class="btn" type="button" id="exportProposalCsv">Excel / CSV</button>
@@ -567,8 +648,100 @@ function renderDashboardV2(main) {
       </div>
     </section>
   `;
+  bindDashboardScopeFilter(main);
   bindDashboardReportActions(main);
   bindProposalActions(main);
+  bindDashboardCopaActions(main);
+}
+
+function dashboardScopeConfig(scope = "general") {
+  const configs = {
+    general: {
+      key: "general",
+      label: "GERAL",
+      stages: workflowStages,
+      labels: workflowLabels,
+      summaryLabel: "propostas no total",
+      helper: `${state.data.events.length} eventos cadastrados`,
+      description: "Use a tela Propostas para filtros detalhados, CSV e relatorios."
+    },
+    externalCourses: {
+      key: "externalCourses",
+      label: "CURSOS EXTERNOS",
+      stages: workflowStages,
+      labels: workflowLabels,
+      summaryLabel: "propostas de cursos externos",
+      helper: "recorte por cursos externos",
+      description: "Recorte das propostas oficiais vinculadas a modelos ou eventos de cursos externos."
+    },
+    copa: {
+      key: "copa",
+      label: "COPA",
+      stages: copaWorkflowStages,
+      labels: copaWorkflowLabels,
+      summaryLabel: "propostas COPA",
+      helper: "recorte COPA local",
+      description: "Recorte local da aba COPA para acompanhar patrocinadores do congresso."
+    },
+    sponsorships: {
+      key: "sponsorships",
+      label: "PATROCÍNIOS",
+      stages: workflowStages,
+      labels: workflowLabels,
+      summaryLabel: "propostas de patrocínios",
+      helper: "recorte por patrocínios",
+      description: "Recorte das propostas oficiais vinculadas a modelos de patrocínio."
+    }
+  };
+  return configs[scope] || configs.general;
+}
+
+function dashboardScopedProposals(scope = "general") {
+  if (scope === "copa") return loadCopaProposals().map(enrichCopaProposal);
+  const proposals = enrichedProposals();
+  if (scope === "externalCourses") return proposals.filter(isExternalCourseProposal);
+  if (scope === "sponsorships") return proposals.filter(isSponsorshipProposal);
+  return proposals;
+}
+
+function proposalTypeText(item) {
+  const event = byId("events", item.eventId);
+  const template = byId("templates", item.templateId);
+  return normalizeModelName(`${template?.type || ""} ${template?.name || ""} ${event?.name || ""} ${event?.description || ""}`);
+}
+
+function isExternalCourseProposal(item) {
+  const text = proposalTypeText(item);
+  return text.includes("curso") || text.includes("evento externo") || text.includes("atividade externa");
+}
+
+function isSponsorshipProposal(item) {
+  const text = proposalTypeText(item);
+  return text.includes("patrocinio") || text.includes("patrocinador") || text.includes("patrocinios");
+}
+
+function dashboardScopeFilter(activeScope) {
+  const scopes = ["general", "externalCourses", "copa", "sponsorships"];
+  return `
+    <section class="panel dashboard-filter-panel">
+      <label class="field dashboard-scope-field">
+        <span>Recorte do dashboard</span>
+        <select id="dashboardScope">
+          ${scopes.map(scope => {
+            const config = dashboardScopeConfig(scope);
+            return `<option value="${escapeAttr(config.key)}" ${activeScope === config.key ? "selected" : ""}>${escapeHtml(config.label)}</option>`;
+          }).join("")}
+        </select>
+      </label>
+    </section>
+  `;
+}
+
+function bindDashboardScopeFilter(scope) {
+  scope.querySelector("#dashboardScope")?.addEventListener("change", event => {
+    state.dashboardScope = event.currentTarget.value;
+    renderDashboardV2(scope);
+  });
 }
 
 function dashboardValueChart(sentValue, convertedValue) {
@@ -597,8 +770,8 @@ function dashboardValueChart(sentValue, convertedValue) {
   `;
 }
 
-function dashboardStageChart(proposals) {
-  const maxCount = Math.max(...workflowStages.map(stage => proposals.filter(item => item.workflowStage === stage).length), 1);
+function dashboardStageChart(proposals, stages = workflowStages, labels = workflowLabels) {
+  const maxCount = Math.max(...stages.map(stage => proposals.filter(item => item.workflowStage === stage).length), 1);
   return `
     <article class="dashboard-card">
       <div class="dashboard-card-header">
@@ -608,12 +781,12 @@ function dashboardStageChart(proposals) {
         </div>
       </div>
       <div class="stage-bars">
-        ${workflowStages.map(stage => {
+        ${stages.map(stage => {
           const count = proposals.filter(item => item.workflowStage === stage).length;
           const width = Math.max(4, Math.round((count / maxCount) * 100));
           return `
             <div class="stage-bar">
-              <div><strong>${escapeHtml(workflowLabels[stage] || stage)}</strong><span>${count}</span></div>
+              <div><strong>${escapeHtml(labels[stage] || stage)}</strong><span>${count}</span></div>
               <i style="--bar-width:${width}%"></i>
             </div>
           `;
@@ -669,7 +842,8 @@ function dashboardStatusChart(proposals) {
   `;
 }
 
-function dashboardRecentList(items) {
+function dashboardRecentList(items, isCopaScope = false) {
+  const labels = isCopaScope ? copaWorkflowLabels : workflowLabels;
   return `
     <article class="dashboard-card wide">
       <div class="dashboard-card-header">
@@ -677,20 +851,26 @@ function dashboardRecentList(items) {
           <span>Atualizacoes</span>
           <h2>Propostas recentes</h2>
         </div>
-        <button class="btn" type="button" onclick="navigate('/propostas')">Ver propostas</button>
+        <button class="btn" type="button" onclick="navigate('${isCopaScope ? "/copa" : "/propostas"}')">Ver propostas</button>
       </div>
       <div class="dashboard-recent-list">
         ${items.length ? items.map(item => `
-          <button type="button" class="dashboard-recent-item" data-edit-proposal="${escapeAttr(item.id)}">
+          <button type="button" class="dashboard-recent-item" ${isCopaScope ? `data-edit-copa-proposal="${escapeAttr(item.id)}"` : `data-edit-proposal="${escapeAttr(item.id)}"`}>
             <span><strong>${escapeHtml(item.controlCode || "Pendente")}</strong>${escapeHtml(item.title)}</span>
             <span>${escapeHtml(item.companyName || "Sem empresa")}</span>
-            <span><i class="badge workflow">${escapeHtml(workflowLabels[item.workflowStage] || item.workflowStage)}</i></span>
+            <span><i class="badge workflow">${escapeHtml(labels[item.workflowStage] || item.workflowStage)}</i></span>
             <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
           </button>
         `).join("") : `<div class="empty">Nenhuma proposta cadastrada.</div>`}
       </div>
     </article>
   `;
+}
+
+function bindDashboardCopaActions(scope) {
+  scope.querySelectorAll("[data-edit-copa-proposal]").forEach(button => {
+    button.addEventListener("click", () => navigate(`/copa/propostas/${button.dataset.editCopaProposal}/editar`));
+  });
 }
 
 function proposalFilters() {
@@ -752,11 +932,18 @@ function bindDashboardReportActions(scope) {
 }
 
 function proposalReportRows() {
+  if (normalizeRoute(location.pathname) === "/dashboard") {
+    return sortProposalsNewestFirst(dashboardScopedProposals(state.dashboardScope));
+  }
   return filterProposals(enrichedProposals());
 }
 
 function activeProposalFilters() {
+  const scopeConfig = normalizeRoute(location.pathname) === "/dashboard"
+    ? dashboardScopeConfig(state.dashboardScope)
+    : null;
   const values = [
+    ["Recorte", scopeConfig && scopeConfig.key !== "general" ? scopeConfig.label : ""],
     ["Busca", document.getElementById("filterSearch")?.value],
     ["Empresa", document.getElementById("filterCompany")?.selectedOptions?.[0]?.text],
     ["Evento", document.getElementById("filterEvent")?.selectedOptions?.[0]?.text],
@@ -764,6 +951,40 @@ function activeProposalFilters() {
   ];
   return values.filter(([, value]) => value && !["Todas", "Todos"].includes(value));
 }
+
+function dashboardWorkflowLabel(item) {
+  return state.dashboardScope === "copa"
+    ? (copaWorkflowLabels[item.workflowStage] || item.workflowStage)
+    : (workflowLabels[item.workflowStage] || item.workflowStage);
+}
+
+function proposalCounterpartItems(item) {
+  const ids = Array.isArray(item.counterpartIds) ? item.counterpartIds : [];
+  return ids
+    .map(id => byId("counterparts", id))
+    .filter(Boolean);
+}
+
+function proposalCounterpartTitles(item) {
+  const counterparts = proposalCounterpartItems(item);
+  return counterparts.length ? counterparts.map(counterpart => counterpart.title).join(" | ") : "Sem contrapartidas selecionadas";
+}
+
+function proposalCounterpartDetails(item) {
+  const counterparts = proposalCounterpartItems(item);
+  return counterparts.length
+    ? counterparts.map(counterpart => {
+      const parts = [
+        counterpart.title,
+        counterpart.category,
+        money(counterpart.estimatedValue) || counterpart.estimatedValue,
+        counterpart.description
+      ].filter(Boolean);
+      return parts.join(" - ");
+    }).join(" | ")
+    : "Sem contrapartidas selecionadas";
+}
+
 function csvCell(value) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -775,16 +996,19 @@ function exportProposalCsv() {
     return;
   }
 
-  const headings = ["Código", "Título", "Empresa", "Evento", "Status", "Etapa", "Responsável", "Valor (R$)", "Atualização"];
+  const headings = ["Código", "Título", "Empresa/Patrocinador", "Evento", "Status", "Etapa", "Responsável", "Valor (R$)", "Contrapartidas", "Detalhes das contrapartidas", "Qtd. contrapartidas", "Atualização"];
   const rows = items.map(item => [
     item.controlCode || "Pendente",
     item.title,
     item.companyName,
     item.eventName,
     item.status,
-    workflowLabels[item.workflowStage] || item.workflowStage,
+    dashboardWorkflowLabel(item),
     item.ownerName,
     parseMoneyValue(item.value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    proposalCounterpartTitles(item),
+    proposalCounterpartDetails(item),
+    proposalCounterpartItems(item).length,
     fmtDate(item.updatedAt?.slice(0, 10))
   ]);
   const csv = `sep=;\r\n${[headings, ...rows].map(row => row.map(csvCell).join(";")).join("\r\n")}`;
@@ -830,9 +1054,9 @@ function printProposalReport() {
         <meta charset="utf-8">
         <title>Relatório de propostas</title>
         <style>
-          @page { size: landscape; margin: 12mm; }
+          @page { size: landscape; margin: 9mm; }
           * { box-sizing: border-box; }
-          body { margin: 0; color: #172033; font: 12px Arial, sans-serif; }
+          body { margin: 0; color: #172033; font: 11px Arial, sans-serif; }
           header { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 3px solid #194a83; padding-bottom: 12px; }
           header img { width: 100px; height: auto; }
           h1 { margin: 0 0 4px; font-size: 22px; color: #194a83; }
@@ -843,10 +1067,11 @@ function printProposalReport() {
           .summary strong { display: block; margin-top: 5px; font-size: 17px; }
           .filters { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; color: #475467; }
           table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #d9e0ea; padding: 7px; text-align: left; vertical-align: top; }
+          th, td { border: 1px solid #d9e0ea; padding: 6px; text-align: left; vertical-align: top; }
           th { background: #78c2c8; color: #123f70; font-size: 10px; text-transform: uppercase; }
           tbody tr:nth-child(even) { background: #f8fafc; }
           .value { white-space: nowrap; }
+          .counterparts { min-width: 220px; }
           footer { margin-top: 12px; color: #667085; font-size: 10px; }
           @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
         </style>
@@ -866,7 +1091,7 @@ function printProposalReport() {
         <section class="filters">${filterText}</section>
         <table>
           <thead>
-            <tr><th>Código</th><th>Título</th><th>Empresa</th><th>Evento</th><th>Status</th><th>Etapa</th><th>Responsável</th><th>Valor</th><th>Atualização</th></tr>
+            <tr><th>Código</th><th>Título</th><th>Empresa/Patrocinador</th><th>Evento</th><th>Status</th><th>Etapa</th><th>Responsável</th><th>Valor</th><th>Contrapartidas</th><th>Atualização</th></tr>
           </thead>
           <tbody>
             ${items.map(item => `
@@ -876,9 +1101,10 @@ function printProposalReport() {
                 <td>${escapeHtml(item.companyName)}</td>
                 <td>${escapeHtml(item.eventName)}</td>
                 <td>${escapeHtml(item.status)}</td>
-                <td>${escapeHtml(workflowLabels[item.workflowStage] || item.workflowStage)}</td>
+                <td>${escapeHtml(dashboardWorkflowLabel(item))}</td>
                 <td>${escapeHtml(item.ownerName)}</td>
                 <td class="value">${escapeHtml(money(item.value))}</td>
+                <td class="counterparts">${escapeHtml(proposalCounterpartDetails(item))}</td>
                 <td>${escapeHtml(fmtDate(item.updatedAt?.slice(0, 10)))}</td>
               </tr>
             `).join("")}
@@ -953,7 +1179,7 @@ function enrichedProposals() {
 function renderKanban(main) {
   const proposals = enrichedProposals();
   main.innerHTML = `
-    ${pageHeader("Kanban", "Acompanhe o andamento operacional das propostas.", canWrite() ? `<button class="btn primary" id="newProposalBtn">Nova proposta</button>` : "")}
+    ${pageHeader("Cursos Externos", "Acompanhe o andamento operacional das propostas.", canWrite() ? `<button class="btn primary" id="newProposalBtn">Nova proposta</button>` : "")}
     <section class="kanban-board">
       ${workflowStages.map(stage => {
         const items = proposals.filter(item => item.workflowStage === stage);
@@ -1298,6 +1524,430 @@ function openKanbanPlanner(proposalId) {
 
 window.openKanbanPlanner = openKanbanPlanner;
 globalThis.openKanbanPlanner = openKanbanPlanner;
+
+function loadCopaProposals() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(copaStorageKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCopaProposals(items) {
+  localStorage.setItem(copaStorageKey, JSON.stringify(items));
+}
+
+function findCopaEvent() {
+  const events = state.data?.events || [];
+  return events.find(event => normalizeModelName(event.name).includes("copa")) || null;
+}
+
+function copaEventTemplate(event = findCopaEvent()) {
+  return findTemplateForEvent(event);
+}
+
+function copaCounterparts(event = findCopaEvent()) {
+  if (!event) return [];
+  return (state.data?.counterparts || [])
+    .filter(item => item.eventId === event.id)
+    .sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "pt-BR"));
+}
+
+function normalizeCopaWorkflowStage(stage) {
+  const aliases = {
+    "Em confeccao": "Em negociacao",
+    "Em negociacao": "Em negociacao",
+    "Proposta enviada": "Proposta enviada",
+    "Em formalizacao": "Em formalizacao",
+    "Em realizacao": "Em formalizacao",
+    "Finalizado": "Concluido",
+    "Concluido": "Concluido",
+    "Declinios": "Proposta recusada",
+    "Proposta recusada": "Proposta recusada"
+  };
+  return aliases[stage] || "Em negociacao";
+}
+
+function nextCopaCode(items) {
+  const year = String(new Date().getFullYear());
+  const max = items.reduce((highest, item) => {
+    const match = String(item.controlCode || "").match(/^COPA-(\d+)\/\d{4}$/);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `COPA-${String(max + 1).padStart(3, "0")}/${year}`;
+}
+
+function copaProposalById(id) {
+  return loadCopaProposals().find(item => item.id === id);
+}
+
+function enrichCopaProposal(item) {
+  const workflowStage = normalizeCopaWorkflowStage(item.workflowStage);
+  const event = item.eventId ? byId("events", item.eventId) : findCopaEvent();
+  const company = item.companyId ? byId("companies", item.companyId) : null;
+  return {
+    ...item,
+    workflowStage,
+    controlCode: item.controlCode || "COPA pendente",
+    companyName: company?.name || item.sponsorName || "Patrocinador sem nome",
+    sponsorName: company?.name || item.sponsorName || "",
+    eventName: event?.name || "Congresso do COPA",
+    eventDate: item.eventDate || event?.date || "",
+    ownerName: item.ownerName || state.user?.name || "Equipe comercial",
+    noteCount: String(item.notes || "").trim() ? 1 : 0,
+    followUpOverdue: false
+  };
+}
+
+function renderCopa(main) {
+  const proposals = loadCopaProposals().map(enrichCopaProposal);
+  const copaEvent = findCopaEvent();
+  const template = copaEventTemplate(copaEvent);
+  const counterparts = copaCounterparts(copaEvent);
+  const total = proposals.reduce((sum, item) => sum + parseMoneyValue(item.value), 0);
+  main.innerHTML = `
+    ${pageHeader("COPA - Patrocinadores", "Ambiente local de teste para propostas do Congresso do COPA.", canWrite() ? `<button class="btn primary" id="newCopaProposalBtn">Nova Proposta - COPA</button>` : "")}
+    <section class="copa-overview">
+      <div class="metric"><span>Propostas Copa</span><strong>${proposals.length}</strong></div>
+      <div class="metric financial"><span>Valor em teste</span><strong>${money(total)}</strong></div>
+      <div class="metric"><span>Contrapartidas COPA</span><strong>${counterparts.length}</strong></div>
+    </section>
+    <section class="panel copa-intro">
+      <strong>${escapeHtml(copaEvent?.name || "Evento COPA não localizado")}</strong>
+      <span>As propostas desta aba ficam salvas somente neste navegador. O modelo e as contrapartidas são lidos do cadastro oficial do evento COPA, sem gravar propostas no kanban principal.</span>
+      <span class="copa-source-status">${template ? "Modelo vinculado" : "Cadastre o modelo no evento COPA"} · ${counterparts.length} contrapartida${counterparts.length === 1 ? "" : "s"}</span>
+    </section>
+    <section class="kanban-board copa-kanban-board">
+      ${copaWorkflowStages.map(stage => {
+        const items = proposals.filter(item => item.workflowStage === stage);
+        return `
+          <div class="kanban-column" data-copa-stage="${escapeAttr(stage)}">
+            <div class="kanban-header">
+              <strong>${copaWorkflowLabels[stage]}</strong>
+              <span>${items.length}</span>
+            </div>
+            <div class="kanban-cards" data-copa-dropzone="${escapeAttr(stage)}">
+              ${items.length ? items.map(item => copaKanbanCard(item)).join("") : `<div class="kanban-empty">Sem propostas nesta etapa.</div>`}
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </section>
+  `;
+  main.querySelector("#newCopaProposalBtn")?.addEventListener("click", () => navigate("/copa/propostas/nova"));
+  bindCopaKanbanActions(main);
+}
+
+function copaKanbanCard(item) {
+  const accentColor = copaWorkflowAccentColors[item.workflowStage] || "#14427d";
+  return `
+    <article class="kanban-card copa-card" style="--kanban-accent:${escapeAttr(accentColor)}" data-copa-proposal="${escapeAttr(item.id)}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para editar" : "Clique para abrir"}">
+      <div class="kanban-card-title">
+        <strong>${escapeHtml(item.title || item.sponsorName || "Proposta Copa")}</strong>
+      </div>
+      <p class="kanban-company">${escapeHtml(item.sponsorName || "Patrocinador sem nome")}</p>
+      <div class="kanban-event">
+        <span>${escapeHtml(item.packageName || "Cota a definir")}</span>
+        <small>${escapeHtml(eventDateLabel(item.eventDate))}</small>
+      </div>
+      <div class="kanban-meta">
+        <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
+      </div>
+      <div class="kanban-follow-up-row">
+        <div class="kanban-note-count">${escapeHtml(item.contactName || "Sem contato")}</div>
+      </div>
+    </article>
+  `;
+}
+
+function bindCopaKanbanActions(scope) {
+  let draggedProposalId = null;
+  scope.querySelectorAll("[data-copa-proposal]").forEach(card => {
+    const open = event => {
+      if (event.target.closest("button")) return;
+      navigate(`/copa/propostas/${card.dataset.copaProposal}/editar`);
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open(event);
+      }
+    });
+    if (!canWrite()) return;
+    card.addEventListener("dragstart", event => {
+      draggedProposalId = card.dataset.copaProposal;
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedProposalId);
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("is-dragging");
+      scope.querySelectorAll(".is-drop-target").forEach(item => item.classList.remove("is-drop-target"));
+      draggedProposalId = null;
+    });
+  });
+
+  scope.querySelectorAll("[data-copa-dropzone]").forEach(dropzone => {
+    if (!canWrite()) return;
+    dropzone.addEventListener("dragover", event => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      dropzone.closest(".kanban-column")?.classList.add("is-drop-target");
+    });
+    dropzone.addEventListener("dragleave", event => {
+      if (!dropzone.contains(event.relatedTarget)) {
+        dropzone.closest(".kanban-column")?.classList.remove("is-drop-target");
+      }
+    });
+    dropzone.addEventListener("drop", event => {
+      event.preventDefault();
+      const proposalId = draggedProposalId || event.dataTransfer.getData("text/plain");
+      moveCopaProposalToStage(proposalId, dropzone.dataset.copaDropzone);
+    });
+  });
+}
+
+function moveCopaProposalToStage(proposalId, nextStage) {
+  if (!copaWorkflowStages.includes(nextStage)) return;
+  const items = loadCopaProposals();
+  const item = items.find(proposal => proposal.id === proposalId);
+  if (!item || item.workflowStage === nextStage) return;
+  item.workflowStage = nextStage;
+  item.status = nextStage === "Proposta recusada" ? "Recusada" : nextStage === "Concluido" ? "Final" : item.status || "Rascunho";
+  item.updatedAt = new Date().toISOString();
+  saveCopaProposals(items);
+  toast(`Proposta Copa movida para ${copaWorkflowLabels[nextStage]}.`);
+  renderCopa(document.getElementById("main"));
+}
+
+function renderCopaProposalForm(main, id = null) {
+  const items = loadCopaProposals();
+  const item = id ? items.find(proposal => proposal.id === id) : null;
+  const copaEvent = item?.eventId ? byId("events", item.eventId) : findCopaEvent();
+  const template = item?.templateId ? byId("templates", item.templateId) : copaEventTemplate(copaEvent);
+  const eventCounterparts = copaCounterparts(copaEvent);
+  const selectedCounterparts = new Set(item?.counterpartIds || []);
+  const selectedCompany = item?.companyId ? byId("companies", item.companyId) : null;
+  if (id && !item) {
+    main.innerHTML = `
+      ${pageHeader("Proposta Copa nao encontrada", "O rascunho local pode ter sido removido.", `<button class="btn" id="backBtn">Voltar</button>`)}
+      <section class="panel"><div class="empty">Abra o kanban Copa para continuar.</div></section>
+    `;
+    main.querySelector("#backBtn").addEventListener("click", () => navigate("/copa"));
+    return;
+  }
+  main.innerHTML = `
+    ${pageHeader(item ? "Editar proposta Copa" : "Nova proposta Copa", "Criação local de propostas específicas para patrocinadores do Congresso do COPA.")}
+    <form class="panel proposal-card copa-proposal-form" id="copaProposalForm">
+      <input type="hidden" name="id" value="${escapeAttr(item?.id || "")}">
+      <input type="hidden" name="eventId" value="${escapeAttr(copaEvent?.id || item?.eventId || "")}">
+      <input type="hidden" name="templateId" value="${escapeAttr(template?.id || item?.templateId || "")}">
+      <div class="form-grid three">
+        <label class="field"><span>Código</span><input name="controlCode" value="${escapeAttr(item?.controlCode || nextCopaCode(items))}" readonly></label>
+        ${input("title", "Título", item?.title || "Proposta de patrocínio - Congresso do COPA", true)}
+        ${select("companyId", "Patrocinador", state.data.companies, item?.companyId, "Selecione uma empresa cadastrada", true)}
+        ${input("contactName", "Contato do patrocinador", item?.contactName || selectedCompany?.contactPerson || "")}
+        ${input("contactInfo", "Email / telefone", item?.contactInfo || selectedCompany?.contacts || "")}
+        ${input("packageName", "Cota / modalidade", item?.packageName || "Patrocínio Congresso do COPA", true)}
+        ${input("value", "Valor", item?.value)}
+        <label class="field"><span>Status</span><select name="status">${proposalStatuses.map(status => `<option ${item?.status === status || (!item && status === "Rascunho") ? "selected" : ""}>${status}</option>`).join("")}</select></label>
+        <label class="field"><span>Etapa operacional</span><select name="workflowStage">${copaWorkflowStages.map(stage => `<option value="${stage}" ${normalizeCopaWorkflowStage(item?.workflowStage) === stage ? "selected" : ""}>${copaWorkflowLabels[stage]}</option>`).join("")}</select></label>
+      </div>
+      ${canWrite() ? `
+        <section class="quick-company-box" id="quickCompanyBox">
+          <button class="quick-company-toggle" type="button" id="quickCompanyToggle">
+            <span>Patrocinador não cadastrado?</span>
+            <strong>Cadastrar empresa agora</strong>
+          </button>
+          <div class="quick-company-form hidden" id="quickCompanyForm">
+            <div class="integrated-section-title"><strong>Cadastro rápido de empresa</strong><span>A empresa será criada na aba Empresas e selecionada como patrocinadora desta proposta.</span></div>
+            <div class="integrated-section-grid">
+              ${input("quickCompanyName", "Nome da empresa", "")}
+              ${input("quickCompanyCnpj", "CNPJ", "")}
+              ${input("quickCompanyContactPerson", "Responsável", "")}
+              ${input("quickCompanyAddress", "Endereço", "")}
+              ${textarea("quickCompanyContacts", "Contatos", "", "full")}
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" id="quickCompanyCancel">Cancelar</button>
+              <button class="btn primary" type="button" id="quickCompanySave">Salvar e selecionar empresa</button>
+            </div>
+          </div>
+        </section>
+      ` : ""}
+      <section class="copa-source-panel">
+        <div><span>Evento base</span><strong>${escapeHtml(copaEvent?.name || "Cadastre o evento COPA em Eventos e modelos")}</strong></div>
+        <div><span>Carta modelo</span><strong>${escapeHtml(template?.name || "Cadastre uma carta modelo no evento COPA")}</strong></div>
+        <div><span>Data fixa</span><strong>${escapeHtml(eventDateLabel(copaEvent?.date))}</strong></div>
+        <div><span>Local fixo</span><strong>${escapeHtml(copaEvent?.location || "Local não cadastrado no evento COPA")}</strong></div>
+      </section>
+      <div class="field full copa-field-stack">
+        <label>Contrapartidas da aba Contrapartidas vinculadas ao evento COPA</label>
+        <div class="counterpart-tools">
+          <label class="field"><span>Buscar</span><input id="copaCounterpartSearch" placeholder="Digite cota, ação, valor ou descrição"></label>
+          <div class="counterpart-count" id="copaCounterpartCount"></div>
+        </div>
+        <div class="check-grid" id="copaCounterpartGrid"></div>
+      </div>
+      <label class="field full">
+        <span>Observações internas</span>
+        <textarea name="notes">${escapeHtml(item?.notes || "")}</textarea>
+      </label>
+      <div class="field full">
+        <label>Conteúdo editável da proposta</label>
+        <textarea class="editor" name="content">${escapeHtml(item?.content || "")}</textarea>
+      </div>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn warn" type="button" id="copaRegenerateBtn">Preencher modelo Copa</button>
+        <button class="btn" type="button" id="copaBackBtn">Voltar</button>
+        ${item ? `<button class="btn danger" type="button" id="copaDeleteBtn">Excluir teste</button>` : ""}
+        <button class="btn primary" type="submit">Salvar Proposta Copa</button>
+      </div>
+    </form>
+  `;
+  main.querySelector("#copaBackBtn").addEventListener("click", () => navigate("/copa"));
+  main.querySelector("[name='companyId']")?.addEventListener("change", event => {
+    const company = byId("companies", event.currentTarget.value);
+    const contactName = main.querySelector("[name='contactName']");
+    const contactInfo = main.querySelector("[name='contactInfo']");
+    if (contactName && company?.contactPerson) contactName.value = company.contactPerson;
+    if (contactInfo && company?.contacts) contactInfo.value = company.contacts;
+  });
+  bindQuickCompanyCreation(main);
+  renderCopaCounterpartPicker(main, eventCounterparts, selectedCounterparts);
+  main.querySelector("#copaCounterpartSearch")?.addEventListener("input", () => renderCopaCounterpartPicker(main, eventCounterparts, selectedCounterparts));
+  main.querySelector("#copaRegenerateBtn").addEventListener("click", () => {
+    const form = main.querySelector("#copaProposalForm");
+    form.elements.content.value = fillCopaTemplate(readCopaProposalForm(form));
+    toast("Modelo Copa preenchido.");
+  });
+  main.querySelector("#copaDeleteBtn")?.addEventListener("click", () => {
+    if (!confirm("Excluir esta proposta de teste do ambiente Copa?")) return;
+    saveCopaProposals(items.filter(proposal => proposal.id !== id));
+    toast("Proposta Copa excluída do teste local.");
+    navigate("/copa", true);
+  });
+  main.querySelector("#copaProposalForm").addEventListener("submit", event => {
+    event.preventDefault();
+    const payload = readCopaProposalForm(event.currentTarget);
+    const now = new Date().toISOString();
+    const saved = {
+      ...payload,
+      id: item?.id || `copa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      content: payload.content || fillCopaTemplate(payload),
+      createdAt: item?.createdAt || now,
+      updatedAt: now,
+      ownerName: item?.ownerName || state.user?.name || "Equipe comercial"
+    };
+    const nextItems = item
+      ? items.map(proposal => proposal.id === item.id ? saved : proposal)
+      : [...items, saved];
+    saveCopaProposals(nextItems);
+    toast("Proposta Copa salva no ambiente local.");
+    navigate(`/copa/propostas/${saved.id}/editar`, true);
+  });
+}
+
+function renderCopaCounterpartPicker(scope, rows, selectedCounterparts) {
+  const grid = scope.querySelector("#copaCounterpartGrid");
+  if (!grid) return;
+  scope.querySelectorAll("[name='counterpartIds']").forEach(input => {
+    if (input.checked) selectedCounterparts.add(input.value);
+    else selectedCounterparts.delete(input.value);
+  });
+
+  const search = (scope.querySelector("#copaCounterpartSearch")?.value || "").toLowerCase().trim();
+  const visibleRows = rows.filter(row => {
+    const isSelected = selectedCounterparts.has(row.id);
+    const haystack = `${row.title} ${row.category} ${row.description} ${row.estimatedValue} ${row.year}`.toLowerCase();
+    return (row.active || isSelected) && (!search || haystack.includes(search) || isSelected);
+  });
+
+  grid.innerHTML = visibleRows.length ? visibleRows.map(row => `
+    <label class="check-card ${selectedCounterparts.has(row.id) ? "selected" : ""}">
+      <input type="checkbox" name="counterpartIds" value="${escapeAttr(row.id)}" ${selectedCounterparts.has(row.id) ? "checked" : ""}>
+      <span><strong>${escapeHtml(row.title)}</strong><span class="muted">${escapeHtml(row.category || "Sem categoria")} · ${escapeHtml(money(row.estimatedValue) || row.estimatedValue || "Sem valor")}</span></span>
+    </label>
+  `).join("") : `<div class="empty">Nenhuma contrapartida da aba Contrapartidas está vinculada ao evento COPA.</div>`;
+
+  grid.querySelectorAll("[name='counterpartIds']").forEach(input => {
+    input.addEventListener("change", () => {
+      if (input.checked) selectedCounterparts.add(input.value);
+      else selectedCounterparts.delete(input.value);
+      input.closest(".check-card")?.classList.toggle("selected", input.checked);
+      updateCopaCounterpartCount(scope, rows.length, selectedCounterparts.size);
+    });
+  });
+  updateCopaCounterpartCount(scope, rows.length, selectedCounterparts.size);
+}
+
+function updateCopaCounterpartCount(scope, total, selected) {
+  const node = scope.querySelector("#copaCounterpartCount");
+  if (node) node.textContent = `${total} da aba Contrapartidas · ${selected} selecionadas`;
+}
+
+function readCopaProposalForm(form) {
+  const data = new FormData(form);
+  const company = byId("companies", data.get("companyId"));
+  const event = data.get("eventId") ? byId("events", data.get("eventId")) : findCopaEvent();
+  const workflowStage = normalizeCopaWorkflowStage(data.get("workflowStage"));
+  const status = workflowStage === "Proposta recusada" ? "Recusada" : workflowStage === "Concluido" ? "Final" : data.get("status");
+  return {
+    id: data.get("id"),
+    controlCode: data.get("controlCode"),
+    title: data.get("title"),
+    eventId: data.get("eventId"),
+    templateId: data.get("templateId"),
+    companyId: data.get("companyId"),
+    sponsorName: company?.name || "",
+    contactName: data.get("contactName"),
+    contactInfo: data.get("contactInfo"),
+    packageName: data.get("packageName"),
+    eventDate: event?.date || "",
+    eventLocation: event?.location || "",
+    value: data.get("value"),
+    status,
+    workflowStage,
+    counterpartIds: data.getAll("counterpartIds"),
+    notes: data.get("notes"),
+    content: data.get("content")
+  };
+}
+
+function fillCopaTemplate(payload) {
+  const event = payload.eventId ? byId("events", payload.eventId) : findCopaEvent();
+  const template = payload.templateId ? byId("templates", payload.templateId) : copaEventTemplate(event);
+  const company = payload.companyId ? byId("companies", payload.companyId) : null;
+  const sponsorName = company?.name || payload.sponsorName || "";
+  const selectedCounterparts = (state.data?.counterparts || []).filter(item => (payload.counterpartIds || []).includes(item.id));
+  const counterpartsText = selectedCounterparts.length
+    ? selectedCounterparts.map(item => `- ${item.title}: ${item.description || item.category || ""}`.trim()).join("\n")
+    : "- A definir";
+  const replacements = {
+    empresa: sponsorName,
+    endereco: company?.address || "",
+    evento: event?.name || "Congresso do COPA",
+    data: fmtLongDate(),
+    data_evento: eventDateLabel(payload.eventDate || event?.date),
+    local: payload.eventLocation || event?.location || "",
+    responsavel: payload.contactName || company?.contactPerson || payload.contactInfo || "",
+    responsavel_interno: state.user?.name || "",
+    codigo: payload.controlCode || "",
+    patrocinador: sponsorName,
+    contato: payload.contactName || company?.contactPerson || payload.contactInfo || "",
+    cota: payload.packageName || "",
+    valor: payload.value || "",
+    contrapartidas: counterpartsText,
+    observacoes: String(payload.notes || "-").trim() || "-"
+  };
+  let content = template?.content || copaDefaultTemplate;
+  Object.entries(replacements).forEach(([key, value]) => {
+    content = content.replaceAll(`{{${key}}}`, value);
+  });
+  return content;
+}
 
 function renderProposals(main) {
   main.innerHTML = `
