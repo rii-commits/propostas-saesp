@@ -128,6 +128,69 @@ function formatLongDate(value = new Date()) {
   return `${String(source.getDate()).padStart(2, "0")} de ${months[source.getMonth()]} de ${source.getFullYear()}`;
 }
 
+function parseCurrencyValue(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const cleaned = String(value || "").replace(/[^\d,.-]/g, "");
+  if (!cleaned) return 0;
+  const normalized = cleaned.includes(",")
+    ? cleaned.replace(/\./g, "").replace(",", ".")
+    : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function numberWordsUnderThousand(value) {
+  const units = ["", "um", "dois", "tres", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+  const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+  const tens = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+  const hundreds = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+  const number = Math.trunc(value);
+  if (!number) return "";
+  if (number === 100) return "cem";
+  const parts = [];
+  const hundred = Math.floor(number / 100);
+  const rest = number % 100;
+  if (hundred) parts.push(hundreds[hundred]);
+  if (rest >= 10 && rest < 20) parts.push(teens[rest - 10]);
+  else {
+    const ten = Math.floor(rest / 10);
+    const unit = rest % 10;
+    if (ten) parts.push(tens[ten]);
+    if (unit) parts.push(units[unit]);
+  }
+  return parts.join(" e ");
+}
+
+function integerToWords(value) {
+  const number = Math.trunc(value);
+  if (!number) return "zero";
+  const groups = [
+    { value: Math.floor(number / 1000000), singular: "milhao", plural: "milhoes" },
+    { value: Math.floor((number % 1000000) / 1000), singular: "mil", plural: "mil" },
+    { value: number % 1000, singular: "", plural: "" }
+  ];
+  return groups
+    .map(group => {
+      if (!group.value) return "";
+      if (group.singular === "mil") return group.value === 1 ? "mil" : `${numberWordsUnderThousand(group.value)} mil`;
+      if (group.singular) return `${numberWordsUnderThousand(group.value)} ${group.value === 1 ? group.singular : group.plural}`;
+      return numberWordsUnderThousand(group.value);
+    })
+    .filter(Boolean)
+    .join(" e ");
+}
+
+function moneyInWords(value) {
+  const parsed = parseCurrencyValue(value);
+  if (!parsed) return "";
+  const reais = Math.floor(parsed);
+  const centavos = Math.round((parsed - reais) * 100);
+  const parts = [];
+  if (reais) parts.push(`${integerToWords(reais)} ${reais === 1 ? "real" : "reais"}`);
+  if (centavos) parts.push(`${integerToWords(centavos)} ${centavos === 1 ? "centavo" : "centavos"}`);
+  return parts.join(" e ");
+}
+
 function formatEventDate(value) {
   const text = normalizeText(value);
   if (!text) return "";
@@ -164,6 +227,8 @@ function buildProposalReplacements(db, payload) {
     data_evento: formatEventDate(payload.eventDate || event?.date),
     local: payload.eventLocation || event?.location || "",
     valor: payload.value || "",
+    valor_extenso: moneyInWords(payload.value),
+    valor_transcrito: moneyInWords(payload.value),
     responsavel: recipientName,
     responsavel_interno: owner?.name || "",
     contrapartidas: buildCounterpartsText(counterparts),

@@ -21,7 +21,7 @@ const routes = [
   { path: "/usuarios", label: "Usuarios", icon: "@" }
 ];
 
-const variables = ["empresa", "endereco", "evento", "data", "data_evento", "local", "valor", "responsavel", "responsavel_interno", "contrapartidas", "codigo", "conteudo"];
+const variables = ["empresa", "endereco", "evento", "data", "data_evento", "local", "valor", "valor_extenso", "responsavel", "responsavel_interno", "contrapartidas", "codigo", "conteudo"];
 const proposalStatuses = ["Rascunho", "Enviada", "Aprovada", "Recusada", "Cancelada", "Final"];
 const workflowStages = ["Em confeccao", "Proposta enviada", "Em formalizacao", "Em realizacao", "Finalizado", "Declinios"];
 const workflowAccentColors = {
@@ -156,6 +156,58 @@ function money(value) {
   if (value === "" || value === null || value === undefined) return "";
   const parsed = parseMoneyValue(value);
   return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function numberWordsUnderThousand(value) {
+  const units = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+  const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+  const tens = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+  const hundreds = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+  const number = Math.trunc(value);
+  if (!number) return "";
+  if (number === 100) return "cem";
+  const parts = [];
+  const hundred = Math.floor(number / 100);
+  const rest = number % 100;
+  if (hundred) parts.push(hundreds[hundred]);
+  if (rest >= 10 && rest < 20) parts.push(teens[rest - 10]);
+  else {
+    const ten = Math.floor(rest / 10);
+    const unit = rest % 10;
+    if (ten) parts.push(tens[ten]);
+    if (unit) parts.push(units[unit]);
+  }
+  return parts.join(" e ");
+}
+
+function integerToWords(value) {
+  const number = Math.trunc(value);
+  if (!number) return "zero";
+  const groups = [
+    { value: Math.floor(number / 1000000), singular: "milhão", plural: "milhões" },
+    { value: Math.floor((number % 1000000) / 1000), singular: "mil", plural: "mil" },
+    { value: number % 1000, singular: "", plural: "" }
+  ];
+  return groups
+    .map(group => {
+      if (!group.value) return "";
+      if (group.singular === "mil") return group.value === 1 ? "mil" : `${numberWordsUnderThousand(group.value)} mil`;
+      if (group.singular) return `${numberWordsUnderThousand(group.value)} ${group.value === 1 ? group.singular : group.plural}`;
+      return numberWordsUnderThousand(group.value);
+    })
+    .filter(Boolean)
+    .join(" e ");
+}
+
+function moneyInWords(value) {
+  const parsed = parseMoneyValue(value);
+  if (!parsed) return "";
+  const reais = Math.floor(parsed);
+  const centavos = Math.round((parsed - reais) * 100);
+  const parts = [];
+  if (reais) parts.push(`${integerToWords(reais)} ${reais === 1 ? "real" : "reais"}`);
+  if (centavos) parts.push(`${integerToWords(centavos)} ${centavos === 1 ? "centavo" : "centavos"}`);
+  return parts.join(" e ");
 }
 
 function byId(collection, id) {
@@ -1939,6 +1991,8 @@ function fillCopaTemplate(payload) {
     contato: payload.contactName || company?.contactPerson || payload.contactInfo || "",
     cota: payload.packageName || "",
     valor: payload.value || "",
+    valor_extenso: moneyInWords(payload.value),
+    valor_transcrito: moneyInWords(payload.value),
     contrapartidas: counterpartsText,
     observacoes: String(payload.notes || "-").trim() || "-"
   };
@@ -2974,7 +3028,7 @@ function integratedEventConfig() {
     form: item => {
       const linkedTemplate = findTemplateForEvent(item);
       const templateContent = linkedTemplate?.content || defaultProposalTemplateContent();
-      const usefulVariables = ["empresa", "valor", "data", "evento", "responsavel", "contrapartidas", "codigo"];
+      const usefulVariables = ["empresa", "endereco", "valor", "valor_extenso", "data", "evento", "responsavel", "contrapartidas", "codigo"];
       return `
         <form class="model-edit-form">
           <section class="model-edit-topbar">
@@ -3571,6 +3625,8 @@ function localFillTemplate(payload) {
     data_evento: eventDateLabel(payload.eventDate || event?.date),
     local: payload.eventLocation || event?.location || "",
     valor: payload.value || "",
+    valor_extenso: moneyInWords(payload.value),
+    valor_transcrito: moneyInWords(payload.value),
     responsavel: recipientName,
     responsavel_interno: owner?.name || "",
     contrapartidas: counterparts.length ? counterparts.map(item => `- ${item.title}: ${item.description}`).join("\n") : "- A definir",
