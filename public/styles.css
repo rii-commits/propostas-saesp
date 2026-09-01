@@ -2593,6 +2593,15 @@ tbody tr:nth-child(even) td {
   min-width: 0;
 }
 
+.planner-header-actions {
+  align-items: flex-start;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .planner-info-form {
   display: grid;
   gap: 8px;
@@ -3058,6 +3067,10 @@ tbody tr:nth-child(even) td {
 
   .planner-header > .btn {
     align-self: flex-start;
+  }
+
+  .planner-header-actions {
+    justify-content: flex-start;
   }
 
   .planner-event-edit-grid {

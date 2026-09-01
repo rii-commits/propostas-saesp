@@ -1634,7 +1634,7 @@ function enrichCopaProposal(item) {
     eventName: event?.name || "Congresso do COPA",
     eventDate: item.eventDate || event?.date || "",
     ownerName: item.ownerName || state.user?.name || "Equipe comercial",
-    noteCount: String(item.notes || "").trim() ? 1 : 0,
+    noteCount: item.noteCount || 0,
     followUpOverdue: false
   };
 }
@@ -1693,7 +1693,7 @@ function copaKanbanCard(item) {
         <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
       </div>
       <div class="kanban-follow-up-row">
-        <div class="kanban-note-count">${escapeHtml(item.contactName || "Sem contato")}</div>
+        <div class="kanban-note-count">${item.noteCount ? `${item.noteCount} observações` : "Sem observações"}</div>
       </div>
     </article>
   `;
@@ -1704,7 +1704,7 @@ function bindCopaKanbanActions(scope) {
   scope.querySelectorAll("[data-copa-proposal]").forEach(card => {
     const open = event => {
       if (event.target.closest("button")) return;
-      navigate(`/copa/propostas/${card.dataset.copaProposal}/editar`);
+      openCopaKanbanPlanner(card.dataset.copaProposal);
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", event => {
@@ -1768,6 +1768,191 @@ async function moveCopaProposalToStage(proposalId, nextStage) {
     toast(error.message);
   }
 }
+
+function openCopaKanbanPlanner(proposalId) {
+  const proposal = copaOfficialProposals().find(item => item.id === proposalId);
+  if (!proposal) return;
+  const notes = (state.data.proposalNotes || [])
+    .filter(note => note.proposalId === proposalId)
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  document.querySelector(".planner-overlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "planner-overlay";
+  overlay.innerHTML = `
+    <section class="planner-panel" role="dialog" aria-modal="true" aria-label="Acompanhamento da proposta COPA">
+      <div class="planner-header">
+        <div class="planner-readonly-info">
+          <span class="muted">${escapeHtml(proposal.controlCode || "Sem código")}</span>
+          <h2>${escapeHtml(proposal.title)}</h2>
+          <p>${escapeHtml(proposal.companyName)} · ${escapeHtml(proposal.eventName)}</p>
+        </div>
+        <div class="planner-header-actions">
+          ${canWrite() ? `<button class="btn" type="button" data-edit-copa-proposal>Editar carta</button>` : ""}
+          ${canWrite() ? `<button class="btn" type="button" data-download-copa-proposal>Baixar Word</button>` : ""}
+          <button class="btn" type="button" data-close-planner>Fechar</button>
+        </div>
+      </div>
+      <div class="planner-summary">
+        <label>
+          <span>Status</span>
+          <select data-copa-planner-status ${!canWrite() ? "disabled" : ""}>
+            ${proposalStatuses.map(status => `<option value="${escapeAttr(status)}" ${proposal.status === status ? "selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Etapa</span>
+          <select data-copa-planner-stage ${!canWrite() ? "disabled" : ""}>
+            ${copaWorkflowStages.map(stage => `<option value="${escapeAttr(stage)}" ${proposal.workflowStage === stage ? "selected" : ""}>${escapeHtml(copaWorkflowLabels[stage] || stage)}</option>`).join("")}
+          </select>
+        </label>
+        <div><span>Valor</span><strong>${escapeHtml(money(proposal.value) || proposal.value || "Sem valor")}</strong></div>
+        <div><span>Responsável</span><strong>${escapeHtml(proposal.ownerName)}</strong></div>
+      </div>
+      <form class="planner-note-form">
+        <label class="field full">
+          <span>Observações e acompanhamentos</span>
+          <textarea name="content" placeholder="Registre follow-ups, pendências, alinhamentos ou comentários desta proposta." ${!canWrite() ? "disabled" : ""}></textarea>
+        </label>
+        <div class="actions">
+          <button class="btn primary" type="submit" ${!canWrite() ? "disabled" : ""}>Adicionar observação</button>
+        </div>
+      </form>
+      <div class="planner-notes">
+        <h3>Histórico de observações</h3>
+        ${notes.length ? notes.map(note => `
+          <article class="planner-note" data-note-id="${note.id}">
+            <div class="planner-note-header"><strong>${escapeHtml(note.createdByName || "Sistema")}</strong><span>${escapeHtml(fmtDateTime(note.createdAt))}</span></div>
+            <p>${escapeHtml(note.content)}</p>
+            ${canWrite() ? `
+              <div class="planner-note-actions">
+                <button class="note-action" type="button" data-edit-copa-note="${note.id}">Editar</button>
+                <button class="note-action danger-text" type="button" data-delete-copa-note="${note.id}">Excluir</button>
+              </div>
+            ` : ""}
+          </article>
+        `).join("") : `<div class="empty">Nenhuma observação registrada para esta proposta.</div>`}
+      </div>
+    </section>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", event => {
+    if (event.target === overlay) close();
+  });
+  overlay.querySelector("[data-close-planner]").addEventListener("click", close);
+  overlay.querySelector("[data-edit-copa-proposal]")?.addEventListener("click", () => {
+    close();
+    navigate(`/copa/propostas/${proposalId}/editar`);
+  });
+  overlay.querySelector("[data-download-copa-proposal]")?.addEventListener("click", () => downloadDocx(proposalId));
+
+  const savePlannerStatus = async changes => {
+    const current = byId("proposals", proposalId);
+    if (!current) return;
+    try {
+      await api(`/api/proposals/${proposalId}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...current, ...changes })
+      });
+      toast("Proposta Copa atualizada.");
+      close();
+      await reload();
+      navigate("/copa", true);
+      openCopaKanbanPlanner(proposalId);
+    } catch (error) {
+      toast(error.message);
+      close();
+      openCopaKanbanPlanner(proposalId);
+    }
+  };
+  overlay.querySelector("[data-copa-planner-status]")?.addEventListener("change", event => {
+    savePlannerStatus({ status: event.currentTarget.value });
+  });
+  overlay.querySelector("[data-copa-planner-stage]")?.addEventListener("change", event => {
+    const nextStage = event.currentTarget.value;
+    const nextStatus = nextStage === "Proposta recusada"
+      ? "Recusada"
+      : proposal.workflowStage === "Proposta recusada" && proposal.status === "Recusada"
+        ? "Rascunho"
+        : nextStage === "Concluido"
+          ? "Final"
+          : proposal.status;
+    savePlannerStatus({ workflowStage: officialCopaWorkflowStage(nextStage), status: nextStatus });
+  });
+  overlay.querySelector(".planner-note-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const content = new FormData(event.currentTarget).get("content");
+    try {
+      await api(`/api/proposals/${proposalId}/notes`, {
+        method: "POST",
+        body: JSON.stringify({ content })
+      });
+      toast("Observação registrada.");
+      close();
+      await reload();
+      openCopaKanbanPlanner(proposalId);
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  overlay.querySelectorAll("[data-edit-copa-note]").forEach(button => {
+    button.addEventListener("click", () => {
+      const note = notes.find(item => item.id === button.dataset.editCopaNote);
+      const article = button.closest(".planner-note");
+      if (!note || !article) return;
+      article.classList.add("is-editing");
+      article.innerHTML = `
+        <textarea class="note-edit-textarea">${escapeHtml(note.content)}</textarea>
+        <div class="planner-note-actions">
+          <button class="note-action" type="button" data-cancel-copa-note>Cancelar</button>
+          <button class="btn primary" type="button" data-save-copa-note>Salvar alteração</button>
+        </div>
+      `;
+      article.querySelector("[data-cancel-copa-note]").addEventListener("click", () => {
+        close();
+        openCopaKanbanPlanner(proposalId);
+      });
+      article.querySelector("[data-save-copa-note]").addEventListener("click", async () => {
+        const content = article.querySelector(".note-edit-textarea").value;
+        try {
+          await api(`/api/proposals/${proposalId}/notes/${note.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ content })
+          });
+          toast("Observação atualizada.");
+          close();
+          await reload();
+          openCopaKanbanPlanner(proposalId);
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+      article.querySelector(".note-edit-textarea").focus();
+    });
+  });
+  overlay.querySelectorAll("[data-delete-copa-note]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (!confirm("Excluir esta observação?")) return;
+      try {
+        await api(`/api/proposals/${proposalId}/notes/${button.dataset.deleteCopaNote}`, {
+          method: "DELETE"
+        });
+        toast("Observação excluída.");
+        close();
+        await reload();
+        openCopaKanbanPlanner(proposalId);
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+  });
+  overlay.querySelector("textarea")?.focus();
+}
+
+window.openCopaKanbanPlanner = openCopaKanbanPlanner;
+globalThis.openCopaKanbanPlanner = openCopaKanbanPlanner;
 
 function renderCopaProposalForm(main, id = null) {
   const item = id ? copaProposalById(id) : null;
