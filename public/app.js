@@ -1851,10 +1851,12 @@ function renderCopaProposalForm(main, id = null) {
         <button class="btn" type="button" id="copaBackBtn">Voltar</button>
         ${item ? `<button class="btn danger" type="button" id="copaDeleteBtn">Excluir proposta</button>` : ""}
         <button class="btn primary" type="submit">Salvar Proposta Copa</button>
+        ${item ? `<button class="btn" type="button" id="copaDownloadBtn" ${!canWrite() ? "disabled" : ""}>Baixar Word</button>` : ""}
       </div>
     </form>
   `;
   main.querySelector("#copaBackBtn").addEventListener("click", () => navigate("/copa"));
+  main.querySelector("#copaDownloadBtn")?.addEventListener("click", () => downloadDocx(item.id));
   main.querySelector("[name='companyId']")?.addEventListener("change", event => {
     const company = byId("companies", event.currentTarget.value);
     const contactName = main.querySelector("[name='contactName']");
