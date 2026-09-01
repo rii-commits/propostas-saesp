@@ -573,12 +573,10 @@ function renderDashboard(main) {
   const filtered = filterProposals(proposals);
   const sentStages = workflowStages.filter(stage => stage !== "Em confeccao");
   const convertedStages = ["Em formalizacao", "Em realizacao", "Finalizado"];
-  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage));
+  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage) || ["Enviada", "Aprovada", "Final"].includes(item.status));
   const convertedItems = proposals.filter(item => convertedStages.includes(item.workflowStage));
   const acceptedItems = proposals.filter(item => ["Aprovada", "Final"].includes(item.status) || convertedStages.includes(item.workflowStage));
-  const sentValue = proposals
-    .filter(item => sentStages.includes(item.workflowStage))
-    .reduce((total, item) => total + parseMoneyValue(item.value), 0);
+  const sentValue = sentItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
   const convertedValue = proposals
     .filter(item => convertedStages.includes(item.workflowStage))
     .reduce((total, item) => total + parseMoneyValue(item.value), 0);
@@ -614,7 +612,7 @@ function renderDashboardV2(main) {
     ? copaWorkflowStages.filter(stage => stage !== "Em negociacao")
     : workflowStages.filter(stage => stage !== "Em confeccao");
   const convertedStages = isCopaScope ? ["Em formalizacao", "Concluido"] : ["Em formalizacao", "Em realizacao", "Finalizado"];
-  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage));
+  const sentItems = proposals.filter(item => sentStages.includes(item.workflowStage) || ["Enviada", "Aprovada", "Final"].includes(item.status));
   const convertedItems = proposals.filter(item => convertedStages.includes(item.workflowStage));
   const acceptedItems = proposals.filter(item => ["Aprovada", "Final"].includes(item.status) || convertedStages.includes(item.workflowStage));
   const sentValue = sentItems.reduce((total, item) => total + parseMoneyValue(item.value), 0);
