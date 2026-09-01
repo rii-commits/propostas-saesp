@@ -1622,7 +1622,7 @@ function normalizeCopaWorkflowStage(stage) {
 }
 
 function nextCopaCode(items) {
-  const year = String(new Date().getFullYear());
+  const year = "2027";
   const max = items.reduce((highest, item) => {
     const match = String(item.controlCode || "").match(/^COPA-(\d+)\/\d{4}$/);
     return match ? Math.max(highest, Number(match[1])) : highest;
