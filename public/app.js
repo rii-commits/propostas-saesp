@@ -728,6 +728,7 @@ function proposalTypeText(item) {
 }
 
 function isExternalCourseProposal(item) {
+  if (isCopaProposal(item)) return false;
   const text = proposalTypeText(item);
   return text.includes("curso") || text.includes("evento externo") || text.includes("atividade externa");
 }
@@ -1194,7 +1195,7 @@ function enrichedProposals() {
 }
 
 function renderKanban(main) {
-  const proposals = enrichedProposals();
+  const proposals = enrichedProposals().filter(item => !isCopaProposal(item));
   main.innerHTML = `
     ${pageHeader("Cursos Externos", "Acompanhe o andamento operacional das propostas.", canWrite() ? `<button class="btn primary" id="newProposalBtn">Nova proposta</button>` : "")}
     <section class="kanban-board">
