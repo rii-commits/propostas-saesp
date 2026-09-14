@@ -89,6 +89,7 @@ create table if not exists public.proposals (
   workflow_stage text not null default 'Em confeccao',
   content text not null default '',
   counterpart_ids uuid[] not null default '{}',
+  realization_year text not null default '' check (realization_year = '' or realization_year ~ '^(19|20|21)[0-9]{2}$'),
   control_year text not null default '',
   control_sequence integer,
   control_code text not null default '',

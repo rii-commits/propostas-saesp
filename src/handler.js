@@ -129,6 +129,7 @@ async function handleGenerateDocx(req, res, db, proposalId, user) {
 async function handleCreate(resource, body, db, user) {
   const payload = sanitizeEntity(resource, body);
   if (resource === "proposals") {
+    if (!payload.realizationYear) throw new Error("Informe o ano de realização da proposta.");
     if (db.proposals.some(item => item.controlCode === payload.controlCode)) {
       throw new Error(`O codigo ${payload.controlCode} ja esta em uso.`);
     }

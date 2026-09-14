@@ -181,6 +181,7 @@ async function addProposalChangeLog(db, previous, current, user, action = "Atual
       ["title", "Titulo"],
       ["companyId", "Empresa"],
       ["eventId", "Evento"],
+      ["realizationYear", "Ano de realização"],
       ["eventDate", "Data do evento"],
       ["eventLocation", "Local do evento"],
       ["templateId", "Modelo"],

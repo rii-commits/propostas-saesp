@@ -85,6 +85,7 @@ const fieldMaps = {
       workflowStage: "workflow_stage",
       content: "content",
       counterpartIds: "counterpart_ids",
+      realizationYear: "realization_year",
       controlYear: "control_year",
       controlSequence: "control_sequence",
       controlCode: "control_code",

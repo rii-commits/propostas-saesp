@@ -454,6 +454,7 @@ async function createRecoveryCodeChallenge(verifier) {
 }
 
 function renderApp() {
+  initializeRealizationYear();
   const active = normalizeRoute(state.route);
   app().innerHTML = `
     <div class="app-shell ${state.sidebarExpanded ? "sidebar-expanded" : ""}">
@@ -479,7 +480,7 @@ function renderApp() {
           <button class="btn ghost" id="logoutBtn" style="width:100%;margin-top:12px">Sair</button>
         </div>
       </aside>
-      <main class="main" id="main"></main>
+      <div class="main"><main id="main"></main></div>
     </div>
   `;
 
@@ -564,9 +565,10 @@ function normalizeRoute(route) {
 function pageHeader(title, subtitle, action = "") {
   return `
     <div class="topbar">
-      <div class="page-title"><h1>${title}</h1><p>${subtitle}</p></div>
-      <div class="actions">${action}</div>
+      <div class="page-title"><h1>${title}${yearScopedRoute() ? ` · ${escapeHtml(realizationYearLabel())}` : ""}</h1><p>${subtitle}</p></div>
+      <div class="actions">${yearHeaderSelect()}${action}</div>
     </div>
+    ${yearAlerts()}
   `;
 }
 
@@ -876,7 +878,7 @@ function dashboardRecentList(items, isCopaScope = false) {
       <div class="dashboard-recent-list">
         ${items.length ? items.map(item => `
           <button type="button" class="dashboard-recent-item" ${isCopaScope ? `data-edit-copa-proposal="${escapeAttr(item.id)}"` : `data-edit-proposal="${escapeAttr(item.id)}"`}>
-            <span><strong>${escapeHtml(item.controlCode || "Pendente")}</strong>${escapeHtml(item.title)}</span>
+            <span><strong>${escapeHtml(item.controlCode || "Pendente")}</strong>${escapeHtml(item.title)} <small class="year-badge">${escapeHtml(item.realizationYear || "Ano a definir")}</small></span>
             <span>${escapeHtml(item.companyName || "Sem empresa")}</span>
             <span><i class="badge workflow">${escapeHtml(labels[item.workflowStage] || item.workflowStage)}</i></span>
             <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
@@ -963,6 +965,7 @@ function activeProposalFilters() {
     ? dashboardScopeConfig(state.dashboardScope)
     : null;
   const values = [
+    ["Ano de realização", realizationYearLabel()],
     ["Recorte", scopeConfig && scopeConfig.key !== "general" ? scopeConfig.label : ""],
     ["Busca", document.getElementById("filterSearch")?.value],
     ["Empresa", document.getElementById("filterCompany")?.selectedOptions?.[0]?.text],
@@ -1016,8 +1019,9 @@ function exportProposalCsv() {
     return;
   }
 
-  const headings = ["Código", "Título", "Empresa/Patrocinador", "Evento", "Status", "Etapa", "Responsável", "Valor (R$)", "Contrapartidas", "Detalhes das contrapartidas", "Qtd. contrapartidas", "Atualização"];
+  const headings = ["Ano de realização", "Código", "Título", "Empresa/Patrocinador", "Evento", "Status", "Etapa", "Responsável", "Valor (R$)", "Contrapartidas", "Detalhes das contrapartidas", "Qtd. contrapartidas", "Atualização"];
   const rows = items.map(item => [
+    item.realizationYear || "Ano a definir",
     item.controlCode || "Pendente",
     item.title,
     item.companyName,
@@ -1169,7 +1173,7 @@ function noteAgeInDays(createdAt) {
 }
 
 function enrichedProposals() {
-  return state.data.proposals.map(item => {
+  return state.data.proposals.filter(item => !yearScopedRoute() || matchesRealizationYear(item)).map(item => {
     const notes = (state.data.proposalNotes || [])
       .filter(note => note.proposalId === item.id)
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
@@ -1225,7 +1229,7 @@ function kanbanCard(item) {
   const accentColor = workflowAccentColors[item.workflowStage] || "#14427d";
   return `
     <article class="kanban-card ${item.followUpOverdue ? "follow-up-overdue" : ""}" style="--kanban-accent:${escapeAttr(accentColor)}" data-planner-proposal="${item.id}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para abrir" : "Clique para abrir"}">
-      <div class="kanban-card-title">
+      ${kanbanYearBadge(item)}<div class="kanban-card-title">
         <strong>${escapeHtml(item.title)}</strong>
       </div>
       <p class="kanban-company">${escapeHtml(item.companyName)}</p>
@@ -1683,7 +1687,7 @@ function copaKanbanCard(item) {
   const accentColor = copaWorkflowAccentColors[item.workflowStage] || "#14427d";
   return `
     <article class="kanban-card copa-card" style="--kanban-accent:${escapeAttr(accentColor)}" data-copa-proposal="${escapeAttr(item.id)}" draggable="${canWrite()}" role="button" tabindex="0" title="${canWrite() ? "Arraste para mover ou clique para editar" : "Clique para abrir"}">
-      <div class="kanban-card-title">
+      ${kanbanYearBadge(item)}<div class="kanban-card-title">
         <strong>${escapeHtml(item.title || item.sponsorName || "Proposta Copa")}</strong>
       </div>
       <p class="kanban-company">${escapeHtml(item.sponsorName || "Patrocinador sem nome")}</p>
@@ -1979,6 +1983,7 @@ function renderCopaProposalForm(main, id = null) {
       <input type="hidden" name="templateId" value="${escapeAttr(template?.id || item?.templateId || "")}">
       <div class="form-grid three">
         <label class="field"><span>Código</span><input name="controlCode" value="${escapeAttr(item?.controlCode || nextCopaCode())}" readonly></label>
+        ${realizationYearField(item)}
         ${input("title", "Título", item?.title || "Proposta de patrocínio - Congresso do COPA", true)}
         ${select("companyId", "Patrocinador", state.data.companies, item?.companyId, "Selecione uma empresa cadastrada", true)}
         ${input("contactName", "Contato do patrocinador", enrichedItem?.contactName || selectedCompany?.contactPerson || "")}
@@ -2133,6 +2138,7 @@ function readCopaProposalForm(form) {
   return {
     id: data.get("id"),
     controlCode: data.get("controlCode"),
+    realizationYear: data.get("realizationYear"),
     title: data.get("title"),
     eventId: data.get("eventId"),
     templateId: data.get("templateId"),
@@ -2158,6 +2164,7 @@ function officialCopaProposalPayload(payload) {
   return {
     id: payload.id || undefined,
     controlCode: payload.controlCode,
+    realizationYear: payload.realizationYear,
     title: payload.title,
     companyId: payload.companyId,
     eventId: event.id,
@@ -2433,6 +2440,8 @@ function historyActionIcon(kind) {
 
 function historySentence(log) {
   const user = log.changedByName || "Sistema";
+  const yearChange = (log.changes || []).find(change => change.field === 'realizationYear');
+  if (yearChange) return `Ano alterado de [${yearChange.from || 'Ano a definir'}] para [${yearChange.to || 'Ano a definir'}] por ${user} em ${fmtDateTime(log.createdAt)} · ${log.proposalTitle || 'Proposta'}${log.controlCode ? ` (${log.controlCode})` : ''}`;
   const action = displayHistoryText(log.action || "atualizou");
   const proposal = log.proposalTitle || "Proposta removida";
   const code = log.controlCode ? ` (${log.controlCode})` : "";
@@ -2570,7 +2579,7 @@ function proposalTable(items) {
           <article class="proposal-list-card">
             <div class="proposal-card-id">
               <strong>${escapeHtml(item.controlCode || "Pendente")}</strong>
-              <h3>${escapeHtml(item.title || "Proposta sem titulo")}</h3>
+              <h3>${escapeHtml(item.title || "Proposta sem titulo")}</h3><span class="year-badge">${escapeHtml(item.realizationYear || "Ano a definir")}</span>
               <span>${escapeHtml(money(item.value) || item.value || "Sem valor")}</span>
             </div>
             <div class="proposal-card-context">
@@ -2629,8 +2638,14 @@ function bindProposalActions(scope = document) {
 async function duplicateProposal(id) {
   const proposal = byId("proposals", id);
   if (!proposal) return;
+  const controlCode = prompt("Informe um novo código de controle para a cópia (ex.: C 031/2026):");
+  if (!controlCode) return;
+  const realizationYear = proposal.realizationYear || (/^\d{4}$/.test(state.realizationYear) ? state.realizationYear : prompt("Informe o ano de realização da cópia:"));
+  if (!realizationYear) return;
   try {
     const payload = {
+      controlCode,
+      realizationYear,
       title: `${proposal.title || "Proposta"} - cópia`,
       companyId: proposal.companyId,
       eventId: proposal.eventId,
@@ -3673,6 +3688,7 @@ function renderProposalForm(main, id = null) {
       <input type="hidden" name="id" value="${escapeAttr(item?.id || "")}">
       <div class="form-grid three">
         <label class="field"><span>Código de controle</span><input name="controlCode" value="${escapeAttr(item?.controlCode || "")}" placeholder="Ex.: C 070/2026" inputmode="numeric" autocomplete="off" required ${!canWrite() ? "disabled" : ""}></label>
+        ${realizationYearField(item)}
         ${input("title", "Título", item?.title, true)}
         ${select("companyId", "Empresa", state.data.companies, item?.companyId, "Selecione", true)}
         ${select("eventId", "Evento", state.data.events, item?.eventId, "Selecione", true)}
@@ -3913,6 +3929,7 @@ function readProposalForm(form, regenerateContent) {
   return {
     id: data.get("id"),
     controlCode: data.get("controlCode"),
+    realizationYear: data.get("realizationYear"),
     title: data.get("title"),
     companyId: data.get("companyId"),
     eventId: data.get("eventId"),

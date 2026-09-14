@@ -31,6 +31,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/copa/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/empresas",
       "destination": "/index.html"
     },

@@ -3363,3 +3363,17 @@ tbody tr:nth-child(even) td {
   }
 
 }
+
+:root { --year-blue: #14427d; }
+.year-header-select { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; white-space:nowrap; }
+.year-header-select select { width:auto; min-width:100px; max-width:165px; height:38px; padding:6px 28px 6px 12px; border:1px solid #d7dfe9; border-radius:12px; background-color:#fff; color:#14427d; font-size:13px; font-weight:600; cursor:pointer; }
+.year-header-select select:focus-visible { outline:2px solid #14427d; outline-offset:2px; border-color:#14427d; }
+.year-header-select select:disabled { cursor:default; opacity:.65; }
+.year-alert { display:flex; align-items:center; gap:8px; padding:7px 12px; margin:-6px 0 14px; border:1px solid #eee4cf; border-radius:10px; background:#fffbf2; color:#736342; font-size:12px; line-height:1.5; }
+.year-alert-content { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; flex:1; }
+.year-alert button { border:0; background:transparent; color:#14427d; padding:3px 5px; cursor:pointer; font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+.year-alert .year-alert-close { flex:none; font-size:20px; line-height:1; text-decoration:none; color:#736342; padding:5px; }
+.year-alert button:focus-visible { outline:2px solid #14427d; outline-offset:2px; border-radius:4px; }
+.year-badge { display:inline-block; font-size:11px; font-weight:600; color:#14427d; background:#eaf2fc; padding:3px 8px; border-radius:6px; margin:4px 0; }
+.year-badge-undefined { color:#865d17; background:#fff0ce; }
+@media(max-width:760px) { .year-header-select { gap:5px; } .year-header-select span { max-width:70px; white-space:normal; line-height:1.2; } .year-alert-dot { display:none; } }

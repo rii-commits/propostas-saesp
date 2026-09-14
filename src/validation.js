@@ -89,6 +89,10 @@ function sanitizeEntity(resource, body) {
 
   if (resource === "proposals") {
     delete base.issuedAt;
+    if (base.realizationYear !== undefined) {
+      base.realizationYear = normalizeText(base.realizationYear);
+      if (base.realizationYear && !/^(19|20|21)\d{2}$/.test(base.realizationYear)) throw new Error("Informe o ano de realização entre 1900 e 2199.");
+    }
     Object.assign(base, normalizeControlCode(base.controlCode));
     base.title = normalizeText(base.title);
     base.companyId = base.companyId || null;
