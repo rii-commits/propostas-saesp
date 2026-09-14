@@ -3,9 +3,16 @@ function yearScopedRoute() {
 }
 function initializeRealizationYear() {
   const key = `saesp:realization-year:${state.user.id}`;
-  if (state.yearPreferenceKey === key) return;
+  const selected = state.yearPreferenceKey === key ? state.realizationYear : localStorage.getItem(key);
+  const years = availableRealizationYears();
+  const current = String(new Date().getFullYear());
   state.yearPreferenceKey = key;
-  state.realizationYear = localStorage.getItem(key) || String(new Date().getFullYear());
+  state.realizationYear = ['all', 'undefined', ...years].includes(selected)
+    ? selected : years.includes(current) ? current : years[0] || 'all';
+  localStorage.setItem(key, state.realizationYear);
+}
+function availableRealizationYears() {
+  return [...new Set((state.data?.proposals || []).map(p => String(p.realizationYear || '')).filter(y => /^\d{4}$/.test(y)))].sort((a, b) => Number(b) - Number(a));
 }
 function realizationYearLabel() {
   return state.realizationYear === 'all' ? 'Todos os anos' : state.realizationYear === 'undefined' ? 'Ano a definir' : state.realizationYear;
@@ -25,12 +32,7 @@ function setRealizationYear(value) {
   renderApp();
 }
 function yearHeaderSelect() {
-  const current = new Date().getFullYear();
-  const years = [...new Set([
-    ...Array.from({length: 7}, (_, i) => String(current - 3 + i)),
-    ...state.data.proposals.map(p => String(p.realizationYear || '')).filter(Boolean),
-    ...(/^\d{4}$/.test(state.realizationYear) ? [state.realizationYear] : [])
-  ])].sort((a,b) => Number(b)-Number(a));
+  const years = availableRealizationYears();
   const editing = /\/propostas\/(nova|[^/]+\/editar)$/.test(state.route);
   return `<label class="year-header-select"><span>Ano de realização</span><select id="globalYear" aria-label="Ano de realização" onchange="setRealizationYear(this.value)" ${editing ? 'disabled title="Edite o ano no formulário da proposta"' : ''}>
     ${years.map(y => `<option value="${escapeAttr(y)}" ${state.realizationYear === y ? 'selected' : ''}>${escapeHtml(y)}</option>`).join('')}
