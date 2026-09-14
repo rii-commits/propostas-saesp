@@ -2800,7 +2800,8 @@ function openCompanyEditor(panel, config, item = null, mode = item ? "view" : "e
 
 function companyContactDetails(item = {}) {
   const contacts = String(item.contacts || "");
-  const email = contacts.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const emails = contacts.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  const email = emails.join("; ");
   const phone = contacts.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.trim() || "";
   const phoneDigits = phone.replace(/\D/g, "");
   const whatsappNumber = phoneDigits
@@ -2836,9 +2837,9 @@ function companyProfileCard(item = {}) {
             ${contact.whatsappNumber ? `<a class="company-quick-action whatsapp" href="https://wa.me/${escapeAttr(contact.whatsappNumber)}" target="_blank" rel="noopener" title="Abrir WhatsApp">${routeIcon("message-circle")}</a>` : ""}
           </div>
           <div class="company-profile-item company-action-row">
-            <small>E-mail</small>
+            <small>E-mails</small>
             <strong>${companyProfileValue(contact.email, "E-mail não informado")}</strong>
-            ${contact.email ? `<button class="company-quick-action" type="button" data-copy-company-email="${escapeAttr(contact.email)}" title="Copiar e-mail">${routeIcon("copy")}</button>` : ""}
+            ${contact.email ? `<button class="company-quick-action" type="button" data-copy-company-email="${escapeAttr(contact.email)}" title="Copiar todos os e-mails" aria-label="Copiar todos os e-mails">${routeIcon("copy")}</button>` : ""}
           </div>
         </div>
       </section>
@@ -2871,7 +2872,7 @@ function bindCompanyContactActions(scope) {
           document.execCommand("copy");
           textarea.remove();
         }
-        toast("E-mail copiado!");
+        toast("E-mails copiados!");
       } catch {
         toast(`Copie manualmente: ${email}`);
       }
