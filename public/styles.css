@@ -990,7 +990,213 @@ textarea:disabled {
 }
 
 .company-editor {
-  border-left: 4px solid var(--aqua);
+  border: 1px solid #dfe3ea;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(20, 27, 38, 0.08);
+}
+
+.company-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.company-edit-toggle {
+  border: 1px solid #dfe3ea;
+  background: #fff;
+  color: #374151;
+}
+
+.company-delete-link {
+  min-height: 38px;
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.company-delete-link:hover,
+.company-delete-link:focus-visible {
+  color: #dc2626;
+  outline: 0;
+}
+
+.company-profile-card {
+  display: grid;
+  gap: 18px;
+  padding: 4px 2px 2px;
+}
+
+.company-profile-section {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.company-profile-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.company-profile-section-title {
+  color: #7a8699;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.company-profile-main strong {
+  color: #14427d;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.company-profile-main p,
+.company-location-row p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.company-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.company-profile-item {
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #edf0f5;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.company-profile-item small {
+  color: #7a8699;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.company-profile-item strong {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.company-action-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.company-action-row small,
+.company-action-row strong {
+  grid-column: 1;
+}
+
+.company-quick-action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfe3ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #14427d;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.company-quick-action:hover,
+.company-quick-action:focus-visible {
+  border-color: rgba(20, 66, 125, 0.32);
+  box-shadow: 0 8px 18px rgba(20, 66, 125, 0.12);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.company-quick-action.whatsapp {
+  color: #128c7e;
+}
+
+.company-quick-action .lucide-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.company-location-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.company-location-row .lucide-icon {
+  width: 18px;
+  height: 18px;
+  color: #7a8699;
+}
+
+.company-notes-box {
+  min-height: 82px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f5f6f8;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.company-empty-value {
+  color: #98a2b3;
+  font-weight: 650;
+}
+
+.company-edit-form {
+  padding: 0;
+}
+
+.company-edit-form .form-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.company-edit-form .field {
+  margin: 0;
+}
+
+.company-edit-form .company-notes-input {
+  min-height: 108px;
+  background: #f5f6f8;
+}
+
+.company-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.company-save-btn {
+  min-height: 42px;
+  border-radius: 12px;
+  background: #eb6b3b;
+  color: #fff;
+  padding-inline: 18px;
 }
 
 .model-edit-form {
@@ -3003,6 +3209,8 @@ tbody tr:nth-child(even) td {
 
   .company-toolbar,
   .company-card,
+  .company-profile-grid,
+  .company-edit-form .form-grid.compact,
   .integrated-section-grid,
   #proposalForm .form-grid.three {
     grid-template-columns: 1fr;
@@ -3035,6 +3243,18 @@ tbody tr:nth-child(even) td {
   .company-card-footer,
   .company-toolbar-actions {
     justify-content: flex-start;
+  }
+
+  .company-editor-header,
+  .company-editor-actions,
+  .company-edit-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .company-editor-actions .btn,
+  .company-edit-footer .btn {
+    width: 100%;
   }
 
   .report-toolbar {

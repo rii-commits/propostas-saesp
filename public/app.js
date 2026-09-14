@@ -543,6 +543,8 @@ function routeIcon(key) {
     "/usuarios": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>`,
     "user": `<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>`,
     "phone": `<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.4 2.1L8 9.6a16 16 0 0 0 6.4 6.4l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2z"/>`,
+    "message-circle": `<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>`,
+    "copy": `<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>`,
     "map-pin": `<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/>`,
     "search": `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`
   };
@@ -2752,21 +2754,114 @@ function companyCard(company) {
   `;
 }
 
-function openCompanyEditor(panel, config, item = null) {
+function openCompanyEditor(panel, config, item = null, mode = item ? "view" : "edit") {
+  const isEditing = mode === "edit";
   panel.innerHTML = `
     <div class="company-editor-header">
       <div>
-        <span>${item ? "Editar empresa" : "Nova empresa"}</span>
+        <span>${item ? "Ficha cadastral" : "Nova empresa"}</span>
         <h2>${escapeHtml(item?.name || "Cadastro de empresa")}</h2>
       </div>
-      ${item && canWrite() ? `<button class="btn danger" type="button" data-delete-company="${escapeAttr(item.id)}">Excluir</button>` : ""}
+      <div class="company-editor-actions">
+        ${item && canWrite() ? `<button class="btn subtle company-edit-toggle" type="button" data-edit-company-details="${escapeAttr(item.id)}">${isEditing ? "Visualizar" : "Editar Dados"}</button>` : ""}
+        ${item && canWrite() ? `<button class="company-delete-link" type="button" data-delete-company="${escapeAttr(item.id)}">Excluir</button>` : ""}
+      </div>
     </div>
-    ${config.form(item)}
+    ${isEditing ? config.form(item) : companyProfileCard(item)}
   `;
   panel.classList.remove("hidden");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
-  bindCrudForm(config, panel, item);
+  if (isEditing) {
+    bindCrudForm(config, panel, item);
+    panel.querySelector("[data-cancel-company-edit]")?.addEventListener("click", () => {
+      if (item) openCompanyEditor(panel, config, item, "view");
+      else panel.classList.add("hidden");
+    });
+  }
+  panel.querySelector("[data-edit-company-details]")?.addEventListener("click", () => openCompanyEditor(panel, config, item, isEditing ? "view" : "edit"));
+  bindCompanyContactActions(panel);
   bindCompanyDeleteActions(panel);
+}
+
+function companyContactDetails(item = {}) {
+  const contacts = String(item.contacts || "");
+  const email = contacts.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const phone = contacts.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.trim() || "";
+  const phoneDigits = phone.replace(/\D/g, "");
+  const whatsappNumber = phoneDigits
+    ? (phoneDigits.startsWith("55") ? phoneDigits : `55${phoneDigits}`)
+    : "";
+  return { contacts, email, phone, whatsappNumber };
+}
+
+function companyProfileValue(value, fallback = "Não informado") {
+  const clean = String(value || "").trim();
+  return clean ? escapeHtml(clean) : `<span class="company-empty-value">${fallback}</span>`;
+}
+
+function companyProfileCard(item = {}) {
+  const contact = companyContactDetails(item);
+  return `
+    <article class="company-profile-card">
+      <section class="company-profile-section company-profile-main">
+        <span class="company-profile-section-title">Dados Institucionais</span>
+        <strong>${companyProfileValue(item.name, "Empresa sem nome")}</strong>
+        <p>${companyProfileValue(item.cnpj, "CNPJ não informado")}</p>
+      </section>
+      <section class="company-profile-section">
+        <span class="company-profile-section-title">Ponto de Contato</span>
+        <div class="company-profile-grid">
+          <div class="company-profile-item">
+            <small>Responsável na Empresa</small>
+            <strong>${companyProfileValue(item.contactPerson, "Responsável não informado")}</strong>
+          </div>
+          <div class="company-profile-item company-action-row">
+            <small>Telefone / WhatsApp</small>
+            <strong>${companyProfileValue(contact.phone, "Telefone não informado")}</strong>
+            ${contact.whatsappNumber ? `<a class="company-quick-action whatsapp" href="https://wa.me/${escapeAttr(contact.whatsappNumber)}" target="_blank" rel="noopener" title="Abrir WhatsApp">${routeIcon("message-circle")}</a>` : ""}
+          </div>
+          <div class="company-profile-item company-action-row">
+            <small>E-mail</small>
+            <strong>${companyProfileValue(contact.email, "E-mail não informado")}</strong>
+            ${contact.email ? `<button class="company-quick-action" type="button" data-copy-company-email="${escapeAttr(contact.email)}" title="Copiar e-mail">${routeIcon("copy")}</button>` : ""}
+          </div>
+        </div>
+      </section>
+      <section class="company-profile-section">
+        <span class="company-profile-section-title">Localização</span>
+        <div class="company-location-row">${routeIcon("map-pin")}<p>${companyProfileValue(item.address, "Endereço não informado")}</p></div>
+      </section>
+      <section class="company-profile-section">
+        <span class="company-profile-section-title">Observações</span>
+        <div class="company-notes-box">${companyProfileValue(item.notes, "Sem observações internas")}</div>
+      </section>
+    </article>
+  `;
+}
+
+function bindCompanyContactActions(scope) {
+  scope.querySelectorAll("[data-copy-company-email]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const email = button.dataset.copyCompanyEmail || "";
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(email);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = email;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        toast("E-mail copiado!");
+      } catch {
+        toast(`Copie manualmente: ${email}`);
+      }
+    });
+  });
 }
 
 function bindCompanyCards(scope, rows, config, panel) {
@@ -3279,14 +3374,33 @@ function companyConfig() {
     subtitle: "Contas comerciais e contatos relacionados.",
     collection: "companies",
     form: item => `
-      <form class="form-grid">
-        ${input("name", "Nome", item?.name, true)}
-        ${input("cnpj", "CNPJ", item?.cnpj)}
-        ${input("address", "Endereço", item?.address)}
-        ${input("contactPerson", "Responsável na empresa", item?.contactPerson)}
-        ${textarea("contacts", "Contatos", item?.contacts)}
-        ${textarea("notes", "Observações", item?.notes, "full")}
-        ${formActions()}
+      <form class="company-profile-card company-edit-form">
+        <section class="company-profile-section">
+          <span class="company-profile-section-title">Dados Institucionais</span>
+          <div class="form-grid compact">
+            ${input("name", "Nome da Empresa", item?.name, true)}
+            ${input("cnpj", "CNPJ", item?.cnpj)}
+          </div>
+        </section>
+        <section class="company-profile-section">
+          <span class="company-profile-section-title">Ponto de Contato</span>
+          <div class="form-grid compact">
+            ${input("contactPerson", "Responsável na Empresa", item?.contactPerson)}
+            ${textarea("contacts", "Telefone / WhatsApp e E-mail", item?.contacts)}
+          </div>
+        </section>
+        <section class="company-profile-section">
+          <span class="company-profile-section-title">Localização</span>
+          ${input("address", "Endereço completo", item?.address)}
+        </section>
+        <section class="company-profile-section">
+          <span class="company-profile-section-title">Observações</span>
+          ${textarea("notes", "Anotações internas", item?.notes, "full company-notes-input")}
+        </section>
+        <div class="company-edit-footer">
+          <button class="btn" type="button" data-cancel-company-edit>Cancelar</button>
+          <button class="btn primary company-save-btn" type="submit" ${!canWrite() ? "disabled" : ""}>Salvar</button>
+        </div>
       </form>
     `,
     serialize: form => Object.fromEntries(form),
